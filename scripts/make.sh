@@ -9,6 +9,12 @@ source ./configure
 
 [ -z "$KCONFIG_CONFIG" ] && KCONFIG_CONFIG=".config"
 
+if [ ! -z "$USE_SMACK" ]
+then
+  echo "Using Smack"
+  CFLAGS="$CFLAGS -DUSE_SMACK"
+fi
+
 # Since each cc invocation is short, launch half again as many processes
 # as we have processors so they don't exit faster than we can start them.
 [ -z "$CPUS" ] &&
@@ -90,7 +96,7 @@ then
   # for it.
 
   > generated/optlibs.dat
-  for i in util crypt m resolv selinux
+  for i in util crypt m resolv selinux smack attr
   do
     echo "int main(int argc, char *argv[]) {return 0;}" | \
     ${CROSS_COMPILE}${CC} $CFLAGS -xc - -o /dev/null -Wl,--as-needed -l$i > /dev/null 2>/dev/null &&

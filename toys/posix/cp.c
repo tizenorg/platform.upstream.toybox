@@ -86,6 +86,10 @@ config INSTALL
 #define FOR_cp
 #include "toys.h"
 
+#ifdef USE_SMACK
+#include <sys/smack.h>
+#endif //USE_SMACK
+
 GLOBALS(
   // install's options
   char *group;
