@@ -22,6 +22,10 @@ config PS
 #define FOR_ps
 #include "toys.h"
 
+#ifdef USE_SMACK
+#include <sys/smack.h>
+#endif //USE_SMACK
+
 GLOBALS(
   struct arg_list *llist_o;
   unsigned screen_width;

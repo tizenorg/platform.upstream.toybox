@@ -18,7 +18,7 @@ Toybox combines the most common Linux command line utilities together into a sin
 
 %build
 cp %{SOURCE1} ./.config
-CFLAGS=-DHAVE_SMACK=1  make %{?_smp_mflags} toybox
+USE_SMACK=1  make %{?_smp_mflags} toybox
 
 %install
 make PREFIX=./ install
