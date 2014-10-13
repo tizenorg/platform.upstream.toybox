@@ -14,7 +14,7 @@ BuildRequires : smack-devel
 Toybox combines the most common Linux command line utilities together into a single BSD-licensed executable
 
 %prep
-%autosetup
+%setup -q
 
 %build
 cp %{SOURCE1} ./.config
