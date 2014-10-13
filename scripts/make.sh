@@ -9,6 +9,12 @@ source ./configure
 
 [ -z "$KCONFIG_CONFIG" ] && KCONFIG_CONFIG=".config"
 
+if [ ! -z "$USE_SMACK" ]
+then
+  echo "Using Smack"
+  CFLAGS="$CFLAGS -DUSE_SMACK"
+fi
+
 # Since each cc invocation is short, launch half again as many processes
 # as we have processors so they don't exit faster than we can start them.
 [ -z "$CPUS" ] &&
@@ -175,6 +181,11 @@ do_loudly()
 BUILD="$(echo ${CROSS_COMPILE}${CC} $CFLAGS -I . $OPTIMIZE)"
 FILES="$(echo lib/*.c main.c $TOYFILES)"
 LINK="$(echo $LDOPTIMIZE -o toybox_unstripped -Wl,--as-needed $(cat generated/optlibs.dat))"
+
+if [ ! -z "$USE_SMACK" ]
+then
+  LINK="$LINK -lsmack"
+fi
 
 # This is a parallel version of: do_loudly $BUILD $FILES $LINK || exit 1
 

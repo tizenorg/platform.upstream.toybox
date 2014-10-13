@@ -47,6 +47,10 @@ config LS_COLOR
 #define FOR_ls
 #include "toys.h"
 
+#ifdef USE_SMACK
+#include <sys/smack.h>
+#endif //USE_SMACK
+
 // test sst output (suid/sticky in ls flaglist)
 
 // ls -lR starts .: then ./subdir:

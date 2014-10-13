@@ -18,6 +18,10 @@ config MKFIFO
 #define FOR_mkfifo
 #include "toys.h"
 
+#ifdef USE_SMACK
+#include <sys/smack.h>
+#endif //USE_SMACK
+
 GLOBALS(
   char *m_string;
   mode_t mode;

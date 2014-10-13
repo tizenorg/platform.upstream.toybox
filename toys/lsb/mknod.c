@@ -21,6 +21,10 @@ config MKNOD
 #define FOR_mknod
 #include "toys.h"
 
+#ifdef USE_SMACK
+#include <sys/smack.h>
+#endif //USE_SMACK
+
 void mknod_main(void)
 {
   mode_t modes[] = {S_IFIFO, S_IFCHR, S_IFCHR, S_IFBLK};

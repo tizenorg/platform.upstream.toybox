@@ -53,6 +53,10 @@ config WHOAMI
 #define FOR_id
 #include "toys.h"
 
+#ifdef USE_SMACK
+#include <sys/smack.h>
+#endif //USE_SMACK
+
 GLOBALS(
   int do_u, do_n, do_G, is_groups;
 )
