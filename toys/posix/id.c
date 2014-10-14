@@ -15,7 +15,7 @@ config ID
   bool "id"
   default y
   help
-    usage: id [-nGgru]
+    usage: id [-nGgruZ]
 
     Print user and group ID.
 
@@ -24,6 +24,7 @@ config ID
     -g	Show only the effective group ID
     -r	Show real ID instead of effective ID
     -u	Show only the effective user ID
+    -Z	Show only the security context of the current user
 
 config ID_SELINUX
   bool
@@ -80,6 +81,30 @@ static void s_or_u(char *s, unsigned u, int done)
   }
 }
 
+static void show_security_context(int done)
+{
+#ifdef USE_SMACK
+  char *smack_label = NULL;
+  ssize_t sl_len = -1;
+
+  if ((sl_len = smack_new_label_from_self(&smack_label)) >= 0) {
+    if (!done)
+        putchar(' ');
+    if (!TT.do_Z)
+      printf("context=");
+    printf("%.*s", sl_len, smack_label);
+    free(smack_label);
+  }
+#else
+  if (done)
+    printf("id: -Z works only with smack enabled toybox");
+#endif
+  if (done) {
+    xputc('\n');
+    exit(0);
+  }
+}
+
 static void showid(char *header, unsigned u, char *s)
 {
   printf("%s%u(%s)", header, u, s);
@@ -102,6 +127,13 @@ void do_id(char *username)
     gid = egid = pw->pw_gid;
     if (TT.is_groups) printf("%s : ", pw->pw_name);
   }
+
+  if (TT.do_Z)
+    if (username) {
+      printf("id: cannot print security context when user specified\n");
+      exit(1);
+    } else
+      show_security_context(1);
 
   i = flags & FLAG_r;
   pw = xgetpwuid(i ? uid : euid);
@@ -162,6 +194,9 @@ void do_id(char *username)
     }
     if (CFG_TOYBOX_FREE) free(context);
   }
+
+  if (!TT.do_Z && !username)
+    show_security_context(0);
 
   xputc('\n');
 }
