@@ -6,7 +6,7 @@
  *
  * See http://opengroup.org/onlinepubs/9699919799/utilities/id.html
 
-USE_ID(NEWTOY(id, ">1nGgru[!Ggu]", TOYFLAG_BIN))
+USE_ID(NEWTOY(id, ">1nGgruZ[!ZGgu]", TOYFLAG_BIN))
 USE_GROUPS(OLDTOY(groups, id, NULL, TOYFLAG_USR|TOYFLAG_BIN))
 USE_LOGNAME(OLDTOY(logname, id, ">0", TOYFLAG_BIN))
 USE_LOGNAME(OLDTOY(whoami, id, ">0", TOYFLAG_BIN))
@@ -15,7 +15,7 @@ config ID
   bool "id"
   default y
   help
-    usage: id [-nGgru]
+    usage: id [-nGgruZ]
 
     Print user and group ID.
 
@@ -24,6 +24,7 @@ config ID
     -g	Show only the effective group ID
     -r	Show real ID instead of effective ID
     -u	Show only the effective user ID
+    -Z	Show only the security context of the current user
 
 config GROUPS
   bool "groups"
@@ -58,13 +59,37 @@ config WHOAMI
 #endif //USE_SMACK
 
 GLOBALS(
-  int do_u, do_n, do_G, is_groups;
+  int do_u, do_n, do_G, do_Z, is_groups;
 )
 
 static void s_or_u(char *s, unsigned u, int done)
 {
   if (TT.do_n) printf("%s", s);
   else printf("%u", u);
+  if (done) {
+    xputc('\n');
+    exit(0);
+  }
+}
+
+static void show_security_context(int done)
+{
+#ifdef USE_SMACK
+  char *smack_label = NULL;
+  ssize_t sl_len = -1;
+
+  if ((sl_len = smack_new_label_from_self(&smack_label)) >= 0) {
+    if (!done)
+        putchar(' ');
+    if (!TT.do_Z)
+      printf("context=");
+    printf("%.*s", sl_len, smack_label);
+    free(smack_label);
+  }
+#else
+  if (done)
+    printf("id: -Z works only with smack enabled toybox");
+#endif
   if (done) {
     xputc('\n');
     exit(0);
@@ -93,6 +118,13 @@ void do_id(char *username)
     gid = egid = pw->pw_gid;
     if (TT.is_groups) printf("%s : ", pw->pw_name);
   }
+
+  if (TT.do_Z)
+    if (username) {
+      printf("id: cannot print security context when user specified\n");
+      exit(1);
+    } else
+      show_security_context(1);
 
   i = flags & FLAG_r;
   pw = xgetpwuid(i ? uid : euid);
@@ -131,6 +163,10 @@ void do_id(char *username)
     else if (TT.do_G) s_or_u(grp->gr_name, grp->gr_gid, 0);
     else if (grp->gr_gid != egid) showid("", grp->gr_gid, grp->gr_name);
   }
+
+  if (!TT.do_Z && !username)
+    show_security_context(0);
+
   xputc('\n');
 }
 
@@ -140,6 +176,7 @@ void id_main(void)
   if (FLAG_u) TT.do_u = toys.optflags & FLAG_u;
   if (FLAG_n) TT.do_n = toys.optflags & FLAG_n;
   if (FLAG_G) TT.do_G = toys.optflags & FLAG_G;
+  if (FLAG_Z) TT.do_Z = toys.optflags & FLAG_Z;
 
   // And set the variables for non-id commands.
   TT.is_groups = toys.which->name[0] == 'g';
