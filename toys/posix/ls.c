@@ -5,13 +5,13 @@
  *
  * See http://opengroup.org/onlinepubs/9699919799/utilities/ls.html
 
-USE_LS(NEWTOY(ls, USE_LS_COLOR("(color):;")"goACFHLRSacdfiklmnpqrstux1[-1Cglmnox][-cu][-ftS][-HL]", TOYFLAG_BIN|TOYFLAG_LOCALE))
+USE_LS(NEWTOY(ls, USE_LS_COLOR("(color):;")"goACFHLRZSacdfiklmnpqrstux1[-1Cglmnox][-cu][-ftS][-HL]", TOYFLAG_BIN|TOYFLAG_LOCALE))
 
 config LS
   bool "ls"
   default y
   help
-    usage: ls [-ACFHLRSacdfiklmnpqrstux1] [directory...]
+    usage: ls [-ACFHLRSZacdfiklmnpqrstux1] [directory...]
     list files
 
     what to show:
@@ -22,6 +22,7 @@ config LS
     -u	use access time for timestamps		-A  list all files but . and ..
     -H	follow command line symlinks		-L  follow symlinks
     -R	recursively list files in subdirs	-F  append /dir *exe @sym |FIFO
+    -Z	security context
 
     output formats:
     -1	list one file per line			-C  columns (sorted vertically)
@@ -49,6 +50,7 @@ config LS_COLOR
 
 #ifdef USE_SMACK
 #include <sys/smack.h>
+#include <linux/xattr.h>
 #endif //USE_SMACK
 
 // test sst output (suid/sticky in ls flaglist)
@@ -132,6 +134,39 @@ static char *getgroupname(gid_t gid)
   return gr ? gr->gr_name : TT.gid_buf;
 }
 
+static unsigned getseccontextlen(struct dirtree *st)
+{
+  unsigned ret = 0;
+#ifdef USE_SMACK
+  {
+    char *p = dirtree_path(st, 0);
+    ret = getxattr(p, XATTR_NAME_SMACK, 0, 0);
+    free(p);
+    if (ret < 0)
+      ret = 1;
+  }
+#endif
+  return ret;
+}
+
+static unsigned getseccontext(struct dirtree *st, char *where)
+{
+  unsigned ret = 0;
+  *where = '\0';
+#ifdef USE_SMACK
+  {
+    char *p = dirtree_path(st, 0);
+    ret = getxattr(p, XATTR_NAME_SMACK, where, SMACK_LABEL_LEN +1);
+    free (p);
+    if (ret < 0) {
+      strcpy(where, "?");
+      ret = 1;
+    }
+  }
+#endif
+  return ret;
+}
+
 // Figure out size of printable entry fields for display indent/wrap
 
 static void entrylen(struct dirtree *dt, unsigned *len)
@@ -158,6 +193,7 @@ static void entrylen(struct dirtree *dt, unsigned *len)
     } else len[5] = numlen(st->st_size);
   }
   if (flags & FLAG_s) *len += (len[6] = numlen(st->st_blocks));
+  if (flags & FLAG_Z) *len += (len[7] = getseccontextlen(dt));
 }
 
 static int compare(void *a, void *b)
@@ -263,7 +299,7 @@ static void listfiles(int dirfd, struct dirtree *indir)
 {
   struct dirtree *dt, **sort = 0;
   unsigned long dtlen = 0, ul = 0;
-  unsigned width, flags = toys.optflags, totals[7], len[7],
+  unsigned width, flags = toys.optflags, totals[8], len[8],
     *colsizes = (unsigned *)(toybuf+260), columns = (sizeof(toybuf)-260)/4;
 
   memset(totals, 0, sizeof(totals));
@@ -331,7 +367,7 @@ static void listfiles(int dirfd, struct dirtree *indir)
           colsizes[c] = *len;
           if (totlen > TT.screen_width) break;
         }
-        for (width=0; width<7; width++)
+        for (width=0; width<8; width++)
                 if (len[width] > totals[width]) totals[width] = len[width];
       }
       // If it fit, stop here
@@ -343,7 +379,7 @@ static void listfiles(int dirfd, struct dirtree *indir)
     for (ul = 0; ul<dtlen; ul++)
     {
       entrylen(sort[ul], len);
-      for (width=0; width<7; width++)
+      for (width=0; width<8; width++)
         if (len[width] > totals[width]) totals[width] = len[width];
       blocks += sort[ul]->st.st_blocks;
     }
@@ -408,6 +444,11 @@ static void listfiles(int dirfd, struct dirtree *indir)
       printf("%s% *ld %s%s%s%s", perm, totals[2]+1, (long)st->st_nlink,
              usr, upad, grp, grpad);
 
+      if (flags & FLAG_Z) {
+          getseccontext(sort[next], toybuf+2000);
+          xprintf(" %s%s", toybuf+2000, toybuf+256-(totals[7]-len[7]));
+      }
+
       if (S_ISCHR(st->st_mode) || S_ISBLK(st->st_mode))
         printf("% *d,% 4d", totals[5]-4, major(st->st_rdev),minor(st->st_rdev));
       else printf("% *"PRId64, totals[5]+1, (int64_t)st->st_size);
@@ -415,6 +456,9 @@ static void listfiles(int dirfd, struct dirtree *indir)
       tm = localtime(&(st->st_mtime));
       strftime(thyme, sizeof(thyme), "%F %H:%M", tm);
       xprintf(" %s ", thyme);
+    } else if (flags & FLAG_Z) {
+        getseccontext(sort[next], toybuf+2000);
+        xprintf("%s%s ", toybuf+256-(totals[7]-len[7]), toybuf+2000);
     }
 
     if (flags & FLAG_color) {
