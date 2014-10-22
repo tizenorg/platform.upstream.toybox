@@ -4,19 +4,20 @@
  *
  * See http://opengroup.org/onlinepubs/9699919799/utilities/mkdir.html
 
-USE_MKDIR(NEWTOY(mkdir, "<1vpm:", TOYFLAG_BIN|TOYFLAG_UMASK))
+USE_MKDIR(NEWTOY(mkdir, "<1vpm:Z:", TOYFLAG_BIN|TOYFLAG_UMASK))
 
 config MKDIR
   bool "mkdir"
   default y
   help
-    usage: mkdir [-vp] [-m mode] [dirname...]
+    usage: mkdir [-vp] [-m mode] [-Z context] [dirname...]
 
     Create one or more directories.
 
     -m	set permissions of directory to mode.
     -p	make parent directories as needed.
     -v	verbose
+    -Z	set security context.
 */
 
 #define FOR_mkdir
@@ -24,23 +25,51 @@ config MKDIR
 
 #ifdef USE_SMACK
 #include <sys/smack.h>
+#include <linux/xattr.h>
 #endif //USE_SMACK
 
 GLOBALS(
+  char *arg_context;
   char *arg_mode;
 )
 
 void mkdir_main(void)
 {
   char **s;
+  char *label;
   mode_t mode = (0777&~toys.old_umask);
 
+#ifdef USE_SMACK
+  /* That is usage of side effect. This changes current process smack label.
+   * All directories created later by this process will get access label
+   * equal to process label that they were created by.
+   * Execption is situation, when TRANSMUTE label is set to parent
+   * directory and there is an "t" type access form context label to parent directory.
+   *
+   * TODO Maybe it would be more clean to use smack_label_length for label
+   * validation and then smack_set_label_for_path for setting labels for
+   * directories, but those functions are only available on libsmack 1.1.
+   */
+  if (smack_set_label_for_self(TT.arg_context) < 0)
+    error_exit("Unable to create directory with '%s' as context.", TT.arg_context);
+#endif
 
   if (TT.arg_mode) mode = string_to_mode(TT.arg_mode, 0777);
 
   // Note, -p and -v flags line up with mkpathat() flags
 
-  for (s=toys.optargs; *s; s++)
-    if (mkpathat(AT_FDCWD, *s, mode, toys.optflags|1))
+  for (s=toys.optargs; *s; s++) {
+    if (mkpathat(AT_FDCWD, *s, mode, toys.optflags|1)) {
       perror_msg("'%s'", *s);
+    }
+#ifdef USE_SMACK
+    else {
+      smack_new_label_from_path(*s, XATTR_NAME_SMACK, 0, &label);
+      if (strcmp(label, TT.arg_context) != 0)
+        fprintf(stderr, "Warning: SMACK label of %s set to '%s' and not '%s' due to label transmutation\n",
+                *s, label, TT.arg_context);
+      free(label);
+    }
+#endif
+  }
 }
