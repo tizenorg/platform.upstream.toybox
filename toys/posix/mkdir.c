@@ -36,10 +36,10 @@ GLOBALS(
 void mkdir_main(void)
 {
   char **s;
-  char *label;
   mode_t mode = (0777&~toys.old_umask);
 
 #ifdef USE_SMACK
+  if (toys.optflags & FLAG_Z) {
   /* That is usage of side effect. This changes current process smack label.
    * All directories created later by this process will get access label
    * equal to process label that they were created by.
@@ -50,8 +50,10 @@ void mkdir_main(void)
    * validation and then smack_set_label_for_path for setting labels for
    * directories, but those functions are only available on libsmack 1.1.
    */
-  if (smack_set_label_for_self(TT.arg_context) < 0)
-    error_exit("Unable to create directory with '%s' as context.", TT.arg_context);
+
+    if (smack_set_label_for_self(TT.arg_context) < 0)
+      error_exit("Unable to create directory with '%s' as context.", TT.arg_context);
+  }
 #endif
 
   if (TT.arg_mode) mode = string_to_mode(TT.arg_mode, 0777);
@@ -63,7 +65,8 @@ void mkdir_main(void)
       perror_msg("'%s'", *s);
     }
 #ifdef USE_SMACK
-    else {
+    else if (toys.optflags & FLAG_Z) {
+      char *label;
       smack_new_label_from_path(*s, XATTR_NAME_SMACK, 0, &label);
       if (strcmp(label, TT.arg_context) != 0)
         fprintf(stderr, "Warning: SMACK label of %s set to '%s' and not '%s' due to label transmutation\n",
