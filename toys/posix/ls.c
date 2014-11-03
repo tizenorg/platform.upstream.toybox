@@ -324,6 +324,7 @@ static void listfiles(int dirfd, struct dirtree *indir)
   unsigned long dtlen = 0, ul = 0;
   unsigned width, flags = toys.optflags, totals[LEN_MAX], len[LEN_MAX],
     *colsizes = (unsigned *)(toybuf+260), columns = (sizeof(toybuf)-260)/4;
+  unsigned long blocks = 0;
 #ifdef USE_SMACK
   char ctx_buf[SMACK_LABEL_LEN +1];
 #else
@@ -378,6 +379,7 @@ static void listfiles(int dirfd, struct dirtree *indir)
     entrylen(sort[ul], len, NULL);
     for (width=0; width<LEN_MAX; width++)
       if (len[width] > totals[width]) totals[width] = len[width];
+    blocks += sort[ul]->st.st_blocks;
   }
 
   // Find largest entry in each field for display alignment
@@ -407,8 +409,6 @@ static void listfiles(int dirfd, struct dirtree *indir)
       if (ul == dtlen) break;
     }
   } else if (flags & (FLAG_l|FLAG_o|FLAG_n|FLAG_g|FLAG_s)) {
-    unsigned long blocks = 0;
-
     if (indir->parent) xprintf("total %lu\n", blocks);
   }
 
