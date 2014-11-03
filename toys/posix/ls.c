@@ -373,11 +373,13 @@ static void listfiles(int dirfd, struct dirtree *indir)
 
   if (!(flags & FLAG_f)) qsort(sort, dtlen, sizeof(void *), (void *)compare);
 
+  unsigned long blocks = 0;
   for (ul = 0; ul<dtlen; ul++)
   {
     entrylen(sort[ul], len, NULL);
     for (width=0; width<LEN_MAX; width++)
       if (len[width] > totals[width]) totals[width] = len[width];
+    blocks += sort[ul]->st.st_blocks;
   }
 
   // Find largest entry in each field for display alignment
@@ -407,8 +409,6 @@ static void listfiles(int dirfd, struct dirtree *indir)
       if (ul == dtlen) break;
     }
   } else if (flags & (FLAG_l|FLAG_o|FLAG_n|FLAG_g|FLAG_s)) {
-    unsigned long blocks = 0;
-
     if (indir->parent) xprintf("total %lu\n", blocks);
   }
 
