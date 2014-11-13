@@ -156,7 +156,7 @@ echo -n "Library probe"
 # for it.
 
 > generated/optlibs.dat
-for i in util crypt m resolv
+for i in util crypt m resolv smack attr
 do
   echo "int main(int argc, char *argv[]) {return 0;}" | \
   ${CROSS_COMPILE}${CC} $CFLAGS -xc - -o /dev/null -Wl,--as-needed -l$i > /dev/null 2>/dev/null &&
@@ -181,11 +181,6 @@ do_loudly()
 BUILD="$(echo ${CROSS_COMPILE}${CC} $CFLAGS -I . $OPTIMIZE)"
 FILES="$(echo lib/*.c main.c $TOYFILES)"
 LINK="$(echo $LDOPTIMIZE -o toybox_unstripped -Wl,--as-needed $(cat generated/optlibs.dat))"
-
-if [ ! -z "$USE_SMACK" ]
-then
-  LINK="$LINK -lsmack"
-fi
 
 # This is a parallel version of: do_loudly $BUILD $FILES $LINK || exit 1
 
