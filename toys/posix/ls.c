@@ -50,6 +50,7 @@ config LS_COLOR
 
 #ifdef USE_SMACK
 #include <sys/smack.h>
+#include <sys/xattr.h>
 #include <linux/xattr.h>
 #endif //USE_SMACK
 
