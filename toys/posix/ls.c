@@ -51,6 +51,7 @@ config LS_COLOR
 #ifdef USE_SMACK
 #include <sys/smack.h>
 #include <linux/xattr.h>
+#include <attr/xattr.h>
 #endif //USE_SMACK
 
 // test sst output (suid/sticky in ls flaglist)
