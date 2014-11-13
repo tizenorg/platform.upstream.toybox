@@ -128,12 +128,13 @@ void do_id(char *username)
     if (TT.is_groups) printf("%s : ", pw->pw_name);
   }
 
-  if (TT.do_Z)
+  if (TT.do_Z) {
     if (username) {
       printf("id: cannot print security context when user specified\n");
       exit(1);
     } else
       show_security_context(1);
+  }
 
   i = flags & FLAG_r;
   pw = xgetpwuid(i ? uid : euid);
