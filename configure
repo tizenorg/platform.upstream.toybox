@@ -4,7 +4,7 @@
 
 # A synonym.
 [ -z "$CROSS_COMPILE" ] && CROSS_COMPILE="$CROSS"
-[ -z "$CFLAGS" ] && CFLAGS="-Wall -Wundef -Wno-char-subscripts"
+CFLAGS="$CFLAGS -Wall -Wundef -Wno-char-subscripts"
 # Required for our expected ABI. we're 8-bit clean thus "char" must be unsigned.
 CFLAGS="$CFLAGS -funsigned-char"
 
