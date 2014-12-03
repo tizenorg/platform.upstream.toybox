@@ -5,13 +5,13 @@
  *
  * See http://pubs.opengroup.org/onlinepubs/9699919799/utilities/ps.html
 
-USE_PS(NEWTOY(ps, ">0o*T", TOYFLAG_BIN))
+USE_PS(NEWTOY(ps, ">0o*TZ", TOYFLAG_BIN))
 
 config PS
   bool "ps"
   default n
   help
-    usage: ps [-o COL1,COL2=HEADER] [-T]
+    usage: ps [-o COL1,COL2=HEADER] [-T] [-Z]
     
     Show list of processes
 
@@ -19,6 +19,7 @@ config PS
     -A  Show all processes
     -o	Select columns for display
     -T	Show threads
+    -Z  Show security context
 */
 
 #define FOR_ps
@@ -26,11 +27,14 @@ config PS
 
 #ifdef USE_SMACK
 #include <sys/smack.h>
+#else
+#define SMACK_LABEL_LEN (255)
 #endif //USE_SMACK
 
 GLOBALS(
   struct arg_list *llist_o;
   unsigned screen_width;
+  int do_Z;
 
   void *o;
 )
@@ -168,6 +172,37 @@ static void read_cmdline(int fd, char *cmd_ptr)
   }
 }
 
+static void smack_label_for_pid(const int pid, char *label)
+{
+  int res = -1;
+#ifdef USE_SMACK
+  int fd = -1;
+  char path[BUFF_SIZE];
+  char buf[SMACK_LABEL_LEN + 1];
+#endif
+
+  if (!label)
+    return;
+
+  label[0] = '?';
+  label[1] = '\0';
+#ifdef USE_SMACK
+  res = snprintf(path, BUFF_SIZE, "/proc/%d/attr/current", pid);
+  if ((res >= BUFF_SIZE) || (res <= 0))
+    return;
+
+  fd = open(path, O_RDONLY);
+  if (fd < 0)
+    return;
+  res = read(fd, buf, SMACK_LABEL_LEN);
+  close(fd);
+  if (res <= 0)
+    return;
+  buf[res] = '\0';
+  strcpy(label, buf);
+#endif
+}
+
 // get the processes stats and print the stats
 // corresponding to header attributes.
 static void do_ps_line(int pid, int tid)
@@ -183,6 +218,7 @@ static void do_ps_line(int pid, int tid)
   unsigned long stime, utime, start_time, vsz;
   unsigned ppid, ruid, rgid, pgid;
   struct header_list *p = TT.o;
+  char label[SMACK_LABEL_LEN + 1];
 
   sprintf(stat_buff, "/proc/%d", pid);
   if(stat(stat_buff, &stats)) return;
@@ -322,6 +358,10 @@ static void do_ps_line(int pid, int tid)
       case 15:
         printf("%*lu", width, rss);
         break;
+      case 16:
+        smack_label_for_pid(pid, label);
+        printf("%-*.*s", width, width, label);
+        break;
     }
     p = p->next;
     xputc(' '); //space char
@@ -377,14 +417,17 @@ void ps_main(void)
     {0, "vsz","VSZ", "%*s ", 7, 13},
     {0, "stat", "STAT", "%-*s ", 4, 14},
     {0, "rss", "RSS", "%*s ", 4, 15},
+    {0, "label", "LABEL", "%-*s ", 24, 16},
 {0,0,0,0,0,0}
   };
   
+  if (FLAG_Z) TT.do_Z = toys.optflags & FLAG_Z;
   TT.screen_width = 80; //default width
   terminal_size(&TT.screen_width, NULL);
 
   // Default pid, user, time, comm
   if (!TT.llist_o) {
+    if (TT.do_Z) list_add(&o_list, hdr+16, 0);
     list_add(def_header+4, 0);
     list_add(def_header, 0);
     list_add(def_header+11, 0);
