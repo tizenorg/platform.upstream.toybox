@@ -26,6 +26,7 @@ config NETCAT_LISTEN
   bool "netcat server options (-let)"
   default y
   depends on NETCAT
+  depends on TOYBOX_PTY
   help
     usage: netcat [-t] [-lL COMMAND...]
 
@@ -166,7 +167,6 @@ void netcat_main(void)
           if (!child && toys.optc) {
             int fd = pollfds[0].fd;
 
-            if (!temp) close(sockfd);
             dup2(fd, 0);
             dup2(fd, 1);
             if (toys.optflags&FLAG_L) dup2(fd, 2);

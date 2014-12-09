@@ -41,10 +41,10 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <syslog.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 #include <utime.h>
-#include <utmpx.h>
 
 // Posix networking
 
@@ -64,7 +64,6 @@
 #include <wctype.h>
 
 // LSB 4.1 headers
-#include <pty.h>
 #include <sys/ioctl.h>
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
@@ -132,10 +131,10 @@ extern struct toy_context {
   int toycount;            // Total number of commands in this build
   int signal;              // generic_signal() records what signal it saw here
   int signalfd;            // and writes signal to this fd, if set
-  int recursion;           // How many nested calls to toy_exec()
 
   // This is at the end so toy_init() doesn't zero it.
   jmp_buf *rebound;        // longjmp here instead of exit when do_rebound set
+  int recursion;           // How many nested calls to toy_exec()
 } toys;
 
 // Two big temporary buffers: one for use by commands, one for library functions

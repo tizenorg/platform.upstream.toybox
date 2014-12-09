@@ -164,6 +164,7 @@ static void do_tail(int fd, char *name)
           }
           list->data += bytes;
           list->len -= bytes;
+          bytes = 0;
         }
       } else {
         int len = new->len, count;
@@ -176,9 +177,13 @@ static void do_tail(int fd, char *name)
           linepop = try[count] == '\n';
 
           if (lines > 0) {
+            char c;
+
             do {
+              c = *list->data;
               if (!--(list->len)) free(dlist_pop(&list));
-            } while (*(list->data++) != '\n');
+              else list->data++;
+            } while (c != '\n');
             lines--;
           }
         }

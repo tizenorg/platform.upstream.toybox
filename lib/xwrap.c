@@ -94,6 +94,7 @@ void xprintf(char *format, ...)
   va_start(va, format);
 
   vprintf(format, va);
+  va_end(va);
   if (fflush(stdout) || ferror(stdout)) perror_exit("write");
 }
 
@@ -137,7 +138,7 @@ void xexec_optargs(int skip)
 // with a path isn't a builtin, so /bin/sh won't match the builtin sh.
 void xexec(char **argv)
 {
-  if (CFG_TOYBOX) toy_exec(argv);
+  if (CFG_TOYBOX && !CFG_TOYBOX_NORECURSE) toy_exec(argv);
   execvp(argv[0], argv);
 
   perror_exit("exec %s", argv[0]);

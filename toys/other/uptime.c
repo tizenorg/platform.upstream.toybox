@@ -10,6 +10,7 @@ USE_UPTIME(NEWTOY(uptime, NULL, TOYFLAG_USR|TOYFLAG_BIN))
 config UPTIME
   bool "uptime"
   default y
+  depends on TOYBOX_UTMPX
   help
     usage: uptime
 
@@ -32,6 +33,7 @@ void uptime_main(void)
   sysinfo(&info);
   time(&tmptime);
   now = localtime(&tmptime);
+
   // Obtain info about logged on users
   setutxent();
   while ((entry = getutxent())) if (entry->ut_type == USER_PROCESS) users++;
