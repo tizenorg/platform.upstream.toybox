@@ -1,5 +1,5 @@
 Name: toybox
-Version: 0.5.0
+Version: 0.5.1
 Release: 1%{?dist}
 Summary: ToyBox Core utilities
 Group: Base/Utilities
@@ -23,12 +23,16 @@ cp %{SOURCE1} ./.config
 USE_SMACK=1  make %{?_smp_mflags} toybox
 
 %install
-make PREFIX=./ install
+output="build"
+mkdir -p ./${output}
+make PREFIX=./${output} install
 mkdir -p %{buildroot}%{_bindir}
-##mkdir -p %{buildroot}%{_sbindir}
-cp --preserve=links ./bin/* %{buildroot}%{_bindir}
-##cp --preserve=links ./sbin/* %{buildroot}%{_sbindir}
+mkdir -p %{buildroot}%{_sbindir}
+cp --preserve=links ./${output}/bin/* %{buildroot}%{_bindir}
+cp --preserve=links ./${output}/sbin/* %{buildroot}%{_sbindir}
+cp --preserve=links ./${output}/usr/bin/* %{buildroot}%{_bindir}
+cp --preserve=links ./${output}/usr/sbin/* %{buildroot}%{_sbindir}
 
 %files
 %{_bindir}/*
-##%{_sbindir}/*
+%{_sbindir}/*
