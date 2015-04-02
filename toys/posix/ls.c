@@ -5,7 +5,7 @@
  *
  * See http://opengroup.org/onlinepubs/9699919799/utilities/ls.html
 
-USE_LS(NEWTOY(ls, USE_LS_COLOR("(color):;")"goACFHLRZSacdfiklmnpqrstux1[-1Cglmnox][-cu][-ftS][-HL]", TOYFLAG_BIN|TOYFLAG_LOCALE))
+USE_LS(NEWTOY(ls, USE_LS_COLOR("(color):;")"goACFHLR"USE_LS_SMACK("Z")"Sacdfiklmnpqrstux1[-1Cglmnox][-cu][-ftS][-HL]", TOYFLAG_BIN|TOYFLAG_LOCALE))
 
 config LS
   bool "ls"
@@ -22,7 +22,6 @@ config LS
     -u	use access time for timestamps		-A  list all files but . and ..
     -H	follow command line symlinks		-L  follow symlinks
     -R	recursively list files in subdirs	-F  append /dir *exe @sym |FIFO
-    -Z	security context
 
     output formats:
     -1	list one file per line			-C  columns (sorted vertically)
@@ -32,6 +31,15 @@ config LS
 
     sorting (default is alphabetical):
     -f	unsorted	-r  reverse	-t  timestamp	-S  size
+
+config LS_SMACK
+  bool 
+  default y
+  depends on LS && TOYBOX_SMACK
+  help
+    usage: ls [-Z]
+
+    -Z	security context
 
 config LS_COLOR
   bool "ls --color"
@@ -47,12 +55,6 @@ config LS_COLOR
 
 #define FOR_ls
 #include "toys.h"
-
-#ifdef USE_SMACK
-#include <sys/smack.h>
-#include <sys/xattr.h>
-#include <linux/xattr.h>
-#endif //USE_SMACK
 
 // test sst output (suid/sticky in ls flaglist)
 
@@ -135,39 +137,6 @@ static char *getgroupname(gid_t gid)
   return gr ? gr->gr_name : TT.gid_buf;
 }
 
-static unsigned getseccontextlen(struct dirtree *st)
-{
-  unsigned ret = 0;
-#ifdef USE_SMACK
-  {
-    char *p = dirtree_path(st, 0);
-    ret = getxattr(p, XATTR_NAME_SMACK, 0, 0);
-    free(p);
-    if (ret < 0)
-      ret = 1;
-  }
-#endif
-  return ret;
-}
-
-static unsigned getseccontext(struct dirtree *st, char *where)
-{
-  unsigned ret = 0;
-#ifdef USE_SMACK
-  {
-    char *p = dirtree_path(st, 0);
-    ret = getxattr(p, XATTR_NAME_SMACK, where, SMACK_LABEL_LEN);
-    free (p);
-    if (ret < 0) {
-      *where = '?';
-      ret = 1;
-    }
-  }
-#endif
-  where[ret] = '\0';
-  return ret;
-}
-
 // Figure out size of printable entry fields for display indent/wrap
 
 static void entrylen(struct dirtree *dt, unsigned *len, unsigned *totals)
@@ -209,14 +178,19 @@ static void entrylen(struct dirtree *dt, unsigned *len, unsigned *totals)
       *len += len[6];
   }
 
-  if (flags & FLAG_Z) {
-    len[7] = getseccontextlen(dt) + 1;
-    if (totals)
-      *len += totals[7];
-    else
-      *len += len[7];
+  if (CFG_LS_SMACK) {
+    if (flags & FLAG_Z) {
+      char *zpath = dirtree_path(dt, 0);
+      ssize_t zlen = getxattr(zpath, XATTR_NAME_SMACK, 0, 0);
+      free(zpath);
+      if ((zlen <= 0) || (zlen > SMACK_LABEL_LEN)) zlen = 1;
+      len[7] = 1 + (int)zlen;//+1 stands for additional space
+      if (totals)
+        *len += totals[7];
+      else
+        *len += len[7];
+    }
   }
-
 }
 
 static int compare(void *a, void *b)
@@ -326,11 +300,6 @@ static void listfiles(int dirfd, struct dirtree *indir)
   unsigned width, flags = toys.optflags, totals[LEN_MAX], len[LEN_MAX],
     *colsizes = (unsigned *)(toybuf+260), columns = (sizeof(toybuf)-260)/4;
   unsigned long blocks = 0;
-#ifdef USE_SMACK
-  char ctx_buf[SMACK_LABEL_LEN +1];
-#else
-  char ctx_buf[2];
-#endif
 
   memset(totals, 0, sizeof(totals));
 
@@ -470,9 +439,16 @@ static void listfiles(int dirfd, struct dirtree *indir)
       printf("%s% *ld %s%s%s%s", perm, totals[2]+1, (long)st->st_nlink,
              usr, upad, grp, grpad);
 
-      if (flags & FLAG_Z) {
-          getseccontext(sort[next], ctx_buf);
-          xprintf(" %s%s", ctx_buf, toybuf+256-(totals[7]-len[7]));
+      if (CFG_LS_SMACK) {
+        if (flags & FLAG_Z) {
+          char zbuf[SMACK_LABEL_LEN + 1];
+          char *zpath = dirtree_path(sort[next], 0);
+          ssize_t zlen = getxattr(zpath, XATTR_NAME_SMACK, zbuf, sizeof(zbuf));
+          free(zpath);
+          if ((zlen <= 0) || (zlen > SMACK_LABEL_LEN)) zbuf[0] = '?', zlen = 1;
+          zbuf[zlen] = '\0';
+          xprintf(" %s%s", zbuf, toybuf+256-(totals[7]-(int)zlen));
+        }
       }
 
       if (S_ISCHR(st->st_mode) || S_ISBLK(st->st_mode))
@@ -482,9 +458,16 @@ static void listfiles(int dirfd, struct dirtree *indir)
       tm = localtime(&(st->st_mtime));
       strftime(thyme, sizeof(thyme), "%F %H:%M", tm);
       xprintf(" %s ", thyme);
-    } else if (flags & FLAG_Z) {
-        getseccontext(sort[next], ctx_buf);
-        xprintf("%s%s ", toybuf+256-(totals[7]-len[7]), ctx_buf);
+    } else if (CFG_LS_SMACK) {
+      if (flags & FLAG_Z) {
+        char zbuf[SMACK_LABEL_LEN + 1];
+        char *zpath = dirtree_path(sort[next], 0);
+        ssize_t zlen = getxattr(zpath, XATTR_NAME_SMACK, zbuf, sizeof(zbuf));
+        free(zpath);
+        if ((zlen <= 0) || (zlen > SMACK_LABEL_LEN)) zbuf[0] = '?', zlen = 1;
+        zbuf[zlen] = '\0';
+        xprintf("%s%s ", toybuf+256-(totals[7]-(int)(zlen-1)), zbuf);
+      }
     }
 
     if (flags & FLAG_color) {

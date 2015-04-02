@@ -86,10 +86,6 @@ config INSTALL
 #define FOR_cp
 #include "toys.h"
 
-#ifdef USE_SMACK
-#include <sys/smack.h>
-#endif //USE_SMACK
-
 #include <sys/xattr.h>
 
 GLOBALS(

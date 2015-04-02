@@ -6,7 +6,7 @@
  *
  * See http://opengroup.org/onlinepubs/9699919799/utilities/id.html
 
-USE_ID(NEWTOY(id, ">1"USE_ID_SELINUX("Z")"nGgru[!"USE_ID_SELINUX("Z")"Ggu]", TOYFLAG_BIN))
+USE_ID(NEWTOY(id, ">1"USE_ID_SECURITY("Z")"nGgru[!"USE_ID_SECURITY("Z")"Ggu]", TOYFLAG_BIN))
 USE_GROUPS(NEWTOY(groups, NULL, TOYFLAG_USR|TOYFLAG_BIN))
 USE_LOGNAME(NEWTOY(logname, ">0", TOYFLAG_BIN))
 USE_WHOAMI(OLDTOY(whoami, logname, TOYFLAG_BIN))
@@ -15,7 +15,7 @@ config ID
   bool "id"
   default y
   help
-    usage: id [-nGgruZ]
+    usage: id [-nGgru]
 
     Print user and group ID.
 
@@ -24,16 +24,15 @@ config ID
     -g	Show only the effective group ID
     -r	Show real ID instead of effective ID
     -u	Show only the effective user ID
-    -Z	Show only the security context of the current user
 
-config ID_SELINUX
+config ID_SECURITY
   bool
   default y
-  depends on ID && TOYBOX_SELINUX
+  depends on ID && (TOYBOX_SELINUX || TOYBOX_SMACK)
   help
     usage: id [-Z]
 
-    -Z Show only SELinux context
+    -Z	Show only the security context
 
 config GROUPS
   bool "groups"
@@ -63,10 +62,6 @@ config WHOAMI
 #define FOR_id
 #include "toys.h"
 
-#ifdef USE_SMACK
-#include <sys/smack.h>
-#endif //USE_SMACK
-
 GLOBALS(
   int do_u, do_n, do_G, do_Z, is_groups;
 )
@@ -75,30 +70,6 @@ static void s_or_u(char *s, unsigned u, int done)
 {
   if (TT.do_n) printf("%s", s);
   else printf("%u", u);
-  if (done) {
-    xputc('\n');
-    exit(0);
-  }
-}
-
-static void show_security_context(int done)
-{
-#ifdef USE_SMACK
-  char *smack_label = NULL;
-  ssize_t sl_len = -1;
-
-  if ((sl_len = smack_new_label_from_self(&smack_label)) >= 0) {
-    if (!done)
-        putchar(' ');
-    if (!TT.do_Z)
-      printf("context=");
-    printf("%.*s", sl_len, smack_label);
-    free(smack_label);
-  }
-#else
-  if (done)
-    printf("id: -Z works only with smack enabled toybox");
-#endif
   if (done) {
     xputc('\n');
     exit(0);
@@ -126,14 +97,6 @@ void do_id(char *username)
     uid = euid = pw->pw_uid;
     gid = egid = pw->pw_gid;
     if (TT.is_groups) printf("%s : ", pw->pw_name);
-  }
-
-  if (TT.do_Z) {
-    if (username) {
-      printf("id: cannot print security context when user specified\n");
-      exit(1);
-    } else
-      show_security_context(1);
   }
 
   i = flags & FLAG_r;
@@ -183,21 +146,30 @@ void do_id(char *username)
     }
   }
 
-  if (CFG_TOYBOX_SELINUX) {
-    char *context = NULL;
-
-    if (is_selinux_enabled() < 1) {
-      if (TT.do_Z)
-        error_exit("SELinux disabled");
-    } else if (getcon(&context) == 0) {
-      if (!TT.do_Z) xputc(' ');
-      printf("context=%s", context);
+  if (CFG_ID_SECURITY) {
+    if (CFG_TOYBOX_SELINUX) {
+      char *context = NULL;
+  
+      if (is_selinux_enabled() < 1) {
+        if (TT.do_Z)
+          error_exit("SELinux disabled");
+      } else if (getcon(&context) == 0) {
+        if (!TT.do_Z) xputc(' ');
+        printf("context=%s", context);
+      }
+      if (CFG_TOYBOX_FREE) free(context);
+    } else if (CFG_TOYBOX_SMACK) {
+      char *smack_label = NULL;
+      ssize_t sl_len = -1;
+  
+      if ((sl_len = smack_new_label_from_self(&smack_label)) > 0) {
+        if (!TT.do_Z) xputc(' ');
+        printf("context=%.*s", (int)sl_len, smack_label);
+      } else if (TT.do_Z)
+          error_exit("LSM Smack disabled");
+      if (CFG_TOYBOX_FREE) free(smack_label);
     }
-    if (CFG_TOYBOX_FREE) free(context);
   }
-
-  if (!TT.do_Z && !username)
-    show_security_context(0);
 
   xputc('\n');
 }

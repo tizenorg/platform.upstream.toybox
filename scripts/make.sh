@@ -9,12 +9,6 @@ source ./configure
 
 [ -z "$KCONFIG_CONFIG" ] && KCONFIG_CONFIG=".config"
 
-if [ ! -z "$USE_SMACK" ]
-then
-  echo "Using Smack"
-  CFLAGS="$CFLAGS -DUSE_SMACK"
-fi
-
 # Since each cc invocation is short, launch half again as many processes
 # as we have processors so they don't exit faster than we can start them.
 [ -z "$CPUS" ] &&
