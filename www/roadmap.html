@@ -33,6 +33,7 @@ and progress towards implementing it.</p>
 <li><a href=#sigh>Linux "Standard" Base</a></li>
 <li><a href=#dev_env>Development Environment</a></li>
 <li><a href=#android>Android Toolbox</a></li>
+<li><a href=#tizen>Tizen Core</a></li>
 <li>Miscelaneous: <a href=#klibc>klibc</a>, <a href=#glibc>glibc</a>,
 <a href=#sash>sash</a>, <a href=#sbase>sbase</a>, <a href=#s6>s6</a>...</li>
 </ul>
@@ -203,7 +204,7 @@ when called under the name "bash".</p>
 
 <p>The <a href=http://landley.net/aboriginal>Aboriginal Linux</a>
 self-bootstrapping build still uses the following busybox commands,
-not yet supplied by toybox:</p.
+not yet supplied by toybox:</p>
 
 <blockquote><p>
 ash awk bunzip2 bzip2 dd diff expr fdisk ftpd ftpget ftpput gunzip
@@ -220,73 +221,48 @@ commands are vi, awk, and ash.</p>
 <p>Android has a policy against GPL in userspace, so even though BusyBox
 predates Android by many years, they couldn't use it. Instead they grabbed
 an old version of ash and implemented their own command line utility set
-called "toolbox".</p>
+called "toolbox". ash was later replaced by
+<a href="https://www.mirbsd.org/mksh.htm">mksh</a>; toolbox is being
+replaced by toybox.</p>
 
 <p>Toolbox doesn't have its own repository, instead it's part of Android's
 <a href=https://android.googlesource.com/platform/system/core>system/core
-git repository</a> (this analysis looked at commit 51ccef27cab58).</p>
+git repository</a>.</p>
 
 <h3>Toolbox commands:</h3>
 
-<p>According to core/toolbox/Android.mk the toolbox directory builds the
+<p>According to <a href=https://android.googlesource.com/platform/system/core/+/master/toolbox/Android.mk>
+system/core/toolbox/Android.mk</a> the toolbox directory builds the
 following commands:</p>
 
 <blockquote><b>
-ls mount cat ps kill ln insmod rmmod lsmod ifconfig setconsole
-rm mkdir rmdir reboot getevent sendevent date wipe sync umount
-start stop notify cmp dmesg route hd dd df getprop setprop watchprops
-log sleep renice printenv smd chmod chown newfs_msdos netstat ioctl 
-mv schedtop top iftop id uptime vmstat nandread ionice touch lsof md5 r
-cp du grep watchdogd
+dd du df getevent iftop ioctl ionice log ls
+lsof mount nandread newfs_msdos ps prlimit renice
+sendevent start stop top uptime watchprops
 </b></blockquote>
-
-<p>If selinux is enabled, you also get:</p>
-<blockquote><b>
-getenforce setenforce chcon restorecon runcon getsebool setsebool load_policy
-</b></blockquote>
-
-<p>The Android.mk file also refers to dynarray.c and toolbox.c as library
-code. This leaves the following apparently unused C files in toolbox/*.c, each
-of which has a command_main() function and seems to implement a standalone
-command:</p>
-
-<blockquote><b>
-alarm exists lsusb readtty rotatefb setkey syren
-</b></blockquote>
-
-<h3>Command shell (ash)</h3>
-
-<p>The core/sh subdirectory contains a fork of ash 1.17, and sucks in
-liblinenoise to provide command line history/editing.</p>
 
 <h3>Other Android core commands</h3>
 
-<p>Other than the toolbox and sh directories, the currently interesting
-subdirectories in the core repository are fs_mgr, gpttool, init,
-logcat, logwrapper, mkbootimg, netcfg, run-as, and sdcard.</p>
+<p>Other than the toolbox directory, the currently interesting
+subdirectories in the core repository are gpttool, init,
+logcat, logwrapper, mkbootimg, reboot, and run-as.</p>
 
 <ul>
-<li><b>fs_mgr</b> - subset of mount</li>
 <li><b>gpttool</b> - subset of fdisk</li>
 <li><b>init</b> - Android's PID 1</li>
 <li><b>logcat</b> - read android log format</li>
 <li><b>logwrapper</b> - redirect stdio to android log</li>
 <li><b>mkbootimg</b> - create signed boot image</li>
-<li><b>netcfg</b> - network configuration (sucks in libnetutils)</li>
+<li><b>reboot</b> - Android's reboot(1)</li>
 <li><b>run-as</b> - subset of sudo</li>
-<li><b>sdcard</b> - FUSE wrapper to squash UID/GID/permissions to what FAT supports.</li>
 </ul>
 
 <p>Almost all of these reinvent an existing wheel with less functionality and a
 different user interface. We may want to provide that interface, but
-implementing the full commands (mount, fdisk, init, ifconfig with dhcp,
-and sudo) come first.</p>
+implementing the full commands (fdisk, init, and sudo) come first.</p>
 
-<p>Although logcat/logwrapper also reinvent a wheel, Android did so in the
-kernel and these provide an interface to that.</p>
-
-<p>Also, gpttool and mkbootimg are install tools, and sdcard looks like a
-testing tool. These aren't a priority if android wants to use its own
+<p>Also, gpttool and mkbootimg are install tools.
+These aren't a priority if android wants to use its own
 bespoke code to install itself.</p>
 
 <h3>Analysis</h3>
@@ -294,50 +270,56 @@ bespoke code to install itself.</p>
 <p>For reference, combining everything listed above, we get:</p>
 
 <blockquote><b>
-alarm ash cat chcon chmod chown cmp cp date dd df dmesg du exists fs_mgr
-getenforce
-getevent getprop getsebool gpttool grep hd id ifconfig iftop init insmod ioctl
-ionice kill ln load_policy log logcat logwrapper ls lsmod lsof lsusb md5
-mkbootimg mkdir mount mv nandread netcfg netstat newfs_msdos notify printenv
-ps r readtty reboot renice restorecon rm rmdir rmmod rotatefb route run-as
-runcon schedtop sdcard sendevent setconsole setenforce setkey setprop setsebool
-sleep smd start stop sync syren top touch umount uptime vmstat watchdogd
-watchprops wipe
+dd du df getevent gpttool iftop init ioctl ionice
+log logcat logwrapper ls lsof mkbootimg mount nandread
+newfs_msdos ps prlimit reboot renice run-as
+sendevent start stop top uptime watchprops
 </b></blockquote>
 
 <p>We may eventually implement all of that, but for toybox 1.0 we need to
-focus a bit. For our first pass, let's ignore selinux, strip out the "unlisted"
-commands except lsusb, and grab just logcat and logwrapper from the "core"
+focus a bit. For our first pass, let's ignore selinux [note: the android
+guys submitted selinux code to us and we merged it],
+and grab just logcat and logwrapper from the "core"
 commands (since the rest have some full/standard version providing that
 functionality, which we can implement a shim interface for later).</p>
 
-<p>This means toybox should implement:</p>
+<p>This means toybox should implement (or finish implementing):</p>
 <blockquote><b>
 <span id=toolbox>
-cat chmod chown cmp cp date dd df dmesg du getevent getprop grep hd id ifconfig
-iftop insmod ioctl ionice kill ln log logcat logwrapper ls lsmod lsof lsusb md5
-mkdir mount mv nandread
-netstat newfs_msdos notify printenv ps r reboot renice rm rmdir rmmod route
-schedtop sendevent setconsole setprop sleep smd start stop sync top touch
-umount uptime vmstat watchprops watchdogd wipe
+dd du df getevent iftop ioctl ionice log logcat logwrapper ls lsof
+mount nandread newfs_msdos ps prlimit renice schedtop sendevent
+smd start stop top uptime watchprops
 </span>
 </b></blockquote>
 
-<p>The following Toolbox commands are already covered in previous
-sections of this analysis:</p>
+<hr />
+<h2><a name=tizen /><a href="#tizen">Use case: Tizen Core</a></h2>
+
+<p>The Tizen project has expressed a desire to eliminate GPLv3 software
+from its core system, and is installing toybox as
+<a href=https://wiki.tizen.org/wiki/Toybox>part of this process</a>.</p>
+
+<p>They have a fairly long list of new commands they'd like to see in toybox:</p>
 
 <blockquote><b>
-cat chmod chown cmp cp date dd df dmesg du grep id ifconfig insmod kill ln ls
-lsmod mkdir mount mv ps renice rm rmdir rmmod route sleep sync top touch umount
+<span id=tizen>
+arch base64 users dir vdir unexpand shred join csplit
+hostid nproc runcon sha224 sha256 sha384 sha512 sha3 mkfs.vfat fsck.vfat 
+dosfslabel uname stdbuf pinky diff3 sdiff zcmp zdiff zegrep zfgrep zless zmore
+</span>
 </b></blockquote>
 
-<p>Which leaves the following commands as new from Toolbox:</p>
+<p>In addition, they'd like to use several commands currently in pending:</p>
 
 <blockquote><b>
-getevent getprop hd iftop ioctl ionice log lsof nandread netstat
-newfs_msdos notify printenv r reboot schedtop sendevent setconsole
-setprop smd start stop top uptime vmstat watchprops watchdogd wipe
+<span id=tizen>
+tar diff printf wget rsync fdisk vi less tr test stty fold expr dd
+</span>
 </b></blockquote>
+
+<p>Also, tizen uses a different Linux Security Module called SMACK, so
+many of the SELinux options ala ls -Z need smack alternatives in an
+if/else setup.</p>
 
 <hr /><a name=klibc />
 <h2>klibc:</h2>
@@ -402,7 +384,7 @@ from it into a /proc file, something the kernel is capable of doing itself.
 <a href=http://www.zytor.com/pipermail/klibc/2006-June/001748.html>attempted
 to remove</a> that capability from the kernel, current kernel/power/hibernate.c
 still parses "resume=" on the command line). And yet various distros seem to
-make use of klibc for this>
+make use of klibc for this.
 Given the history of swsusp/hibernate (and 
 <a href=http://lwn.net/Articles/333007>TuxOnIce</a>
 and <a href=http://lwn.net/Articles/242107>kexec jump</a>) I've lost track
@@ -746,7 +728,7 @@ arp makedevs sysctl killall5 crond crontab deluser last mkpasswd watch
 ipaddr iplink iproute blockdev rpm2cpio arping brctl dumpleases fsck
 tcpsvd tftpd
 factor fallocate fsfreeze inotifyd lspci nbd-client partprobe strings
-
+base64 mix
 </span>
 </b></blockquote>
 

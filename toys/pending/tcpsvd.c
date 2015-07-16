@@ -7,7 +7,7 @@
  * No Standard.
 
 USE_TCPSVD(NEWTOY(tcpsvd, "^<3c#=30<1C:b#=20<0u:l:hEv", TOYFLAG_USR|TOYFLAG_BIN))
-USE_TCPSVD(OLDTOY(udpsvd, tcpsvd, OPTSTR_tcpsvd, TOYFLAG_USR|TOYFLAG_BIN))
+USE_TCPSVD(OLDTOY(udpsvd, tcpsvd, TOYFLAG_USR|TOYFLAG_BIN))
 
 config TCPSVD
   bool "tcpsvd"
@@ -392,7 +392,7 @@ void tcpsvd_main(void)
       close(1);
       dup2(newfd, 0);
       dup2(newfd, 1);
-      xexec_optargs(2); //skip IP PORT
+      xexec(toys.optargs+2); //skip IP PORT
     } else {
       insert(&pids, pid, addr);
       xclose(newfd); //close and reopen for next client.

@@ -4,15 +4,6 @@
 // in specific compiler, library, or OS versions, localize all that here
 // and in portability.c
 
-// The tendency of gcc to produce stupid warnings continues with
-// warn_unused_result, which warns about things like ignoring the return code
-// of nice(2) (which is completely useless since -1 is a legitimate return
-// value on success and even the man page tells you to use errno instead).
-
-// This makes it stop.
-
-#undef _FORTIFY_SOURCE
-
 // For musl
 #define _ALL_SOURCE
 
@@ -20,8 +11,14 @@
 
 #ifdef __GNUC__
 #define noreturn	__attribute__((noreturn))
+#if CFG_TOYBOX_DEBUG
+#define printf_format	__attribute__((format(printf, 1, 2)))
+#else
+#define printf_format
+#endif
 #else
 #define noreturn
+#define printf_format
 #endif
 
 // Always use long file support.
@@ -30,6 +27,9 @@
 // This isn't in the spec, but it's how we determine what libc we're using.
 
 #include <features.h>
+
+// Types various replacement prototypes need
+#include <sys/types.h>
 
 // Various constants old build environments might not have even if kernel does
 
@@ -69,6 +69,19 @@ int wcwidth(wchar_t wc);
 #include <time.h>
 char *strptime(const char *buf, const char *format, struct tm *tm);
 
+// They didn't like posix basename so they defined another function with the
+// same name and if you include libgen.h it #defines basename to something
+// else (where they implemented the real basename), and that define breaks
+// the table entry for the basename command. They didn't make a new function
+// with a different name for their new behavior because gnu.
+//
+// Solution: don't use their broken header, provide an inline to redirect the
+// correct name to the broken name.
+
+char *dirname(char *path);
+char *__xpg_basename(char *path);
+static inline char *basename(char *path) { return __xpg_basename(path); }
+
 // uClibc pretends to be glibc and copied a lot of its bugs, but has a few more
 #if defined(__UCLIBC__)
 #include <unistd.h>
@@ -81,13 +94,28 @@ pid_t getsid(pid_t pid);
 // any flag newer than MS_MOVE, which was added in 2001 (linux 2.5.0.5),
 // eleven years earlier.
 
+#include <sys/mount.h>
+#ifndef MS_MOVE
 #define MS_MOVE       (1<<13)
+#endif
+#ifndef MS_REC
 #define MS_REC        (1<<14)
+#endif
+#ifndef MS_SILENT
 #define MS_SILENT     (1<<15)
+#endif
+#ifndef MS_UNBINDABLE
 #define MS_UNBINDABLE (1<<17)
+#endif
+#ifndef MS_PRIVATE
 #define MS_PRIVATE    (1<<18)
+#endif
+#ifndef MS_SLAVE
 #define MS_SLAVE      (1<<19)
+#endif
+#ifndef MS_SHARED
 #define MS_SHARED     (1<<20)
+#endif
 
 // When building under obsolete glibc (Ubuntu 8.04-ish), hold its hand a bit.
 #elif __GLIBC__ == 2 && __GLIBC_MINOR__ < 10
@@ -122,14 +150,21 @@ int utimensat(int fd, const char *path, const struct timespec times[2], int flag
 #ifndef MNT_DETACH
 #define MNT_DETACH 2
 #endif
+#endif // Old glibc
+
+#endif // glibc in general
+
+#if !defined(__GLIBC__) && !defined(__BIONIC__)
+// POSIX basename.
+#include <libgen.h>
 #endif
 
-#endif
-
-#ifdef __MUSL__
-#include <unistd.h>
-// Without this "rm -r dir" fails with "is directory".
-#define faccessat(A, B, C, D) faccessat(A, B, C, 0)
+// glibc was handled above; for 32-bit bionic we need to avoid a collision
+// with toybox's basename_r so we can't include <libgen.h> even though that
+// would give us a POSIX basename(3).
+#if defined(__BIONIC__)
+char *basename(char *path);
+char *dirname(char *path);
 #endif
 
 // Work out how to do endianness
@@ -173,7 +208,7 @@ int clearenv(void);
 #define SWAP_LE64(x) (x)
 #endif
 
-#if defined(__APPLE__) || defined(__ANDROID__) \
+#if defined(__APPLE__) \
     || (defined(__GLIBC__) && __GLIBC__ == 2 && __GLIBC_MINOR__ < 10)
 ssize_t getdelim(char **lineptr, size_t *n, int delim, FILE *stream);
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
@@ -184,9 +219,6 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 #include <sys/swap.h>
 
 // Android is missing some headers and functions
-#if defined(__ANDROID__)
-int sethostname(const char *name, size_t len);
-#endif
 // "generated/config.h" is included first
 #if CFG_TOYBOX_SHADOW
 #include <shadow.h>
@@ -194,12 +226,6 @@ int sethostname(const char *name, size_t len);
 #if CFG_TOYBOX_UTMPX
 #include <utmpx.h>
 #endif
-#if CFG_TOYBOX_PTY
-#include <pty.h>
-#else
-pid_t forkpty(int *amaster, char *name, void *termp, void *winp);
-#endif
-
 
 // Some systems don't define O_NOFOLLOW, and it varies by architecture, so...
 #include <fcntl.h>
@@ -207,8 +233,16 @@ pid_t forkpty(int *amaster, char *name, void *termp, void *winp);
 #define O_NOFOLLOW 0
 #endif
 
+#ifndef O_NOATIME
+#define O_NOATIME 01000000
+#endif
+
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 02000000
+#endif
+
+#ifndef O_PATH
+#define O_PATH   010000000
 #endif
 
 #if defined(__SIZEOF_DOUBLE__) && defined(__SIZEOF_LONG__) \
@@ -217,4 +251,11 @@ typedef double FLOAT;
 #else
 typedef float FLOAT;
 #endif
+
+#ifndef __uClinux__
+pid_t xfork(void);
+#endif
+
+//#define strncpy(...) @@strncpyisbadmmkay@@
+//#define strncat(...) @@strncatisbadmmkay@@
 

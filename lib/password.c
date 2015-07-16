@@ -1,6 +1,8 @@
 /* password.c - password read/update helper functions.
  *
  * Copyright 2012 Ashwini Kumar <ak.ashwini@gmail.com>
+ *
+ * TODO: cleanup
  */
 
 #include "toys.h"
@@ -8,7 +10,7 @@
 
 // generate appropriate random salt string for given encryption algorithm.
 int get_salt(char *salt, char *algo)
-{      
+{
   struct {
     char *type, id, len;
   } al[] = {{"des", 0, 2}, {"md5", 1, 8}, {"sha256", 5, 16}, {"sha512", 6, 16}};
@@ -44,39 +46,6 @@ int get_salt(char *salt, char *algo)
   }
 
   return -1;
-}
-
-// Reset terminal to known state, returning old state if old != NULL.
-int set_terminal(int fd, int raw, struct termios *old)
-{
-  struct termios termio;
-
-  if (!tcgetattr(fd, &termio) && old) *old = termio;
-
-  // the following are the bits set for an xterm. Linux text mode TTYs by
-  // default add two additional bits that only matter for serial processing
-  // (turn serial line break into an interrupt, and XON/XOFF flow control)
-
-  // Any key unblocks output, swap CR and NL on input
-  termio.c_iflag = IXANY|ICRNL|INLCR;
-  if (toys.which->flags & TOYFLAG_LOCALE) termio.c_iflag |= IUTF8;
-
-  // Output appends CR to NL, does magic undocumented postprocessing
-  termio.c_oflag = ONLCR|OPOST;
-
-  // Leave serial port speed alone
-  // termio.c_cflag = C_READ|CS8|EXTB;
-
-  // Generate signals, input entire line at once, echo output
-  // erase, line kill, escape control characters with ^
-  // erase line char at a time
-  // "extended" behavior: ctrl-V quotes next char, ctrl-R reprints unread chars,
-  // ctrl-W erases word
-  termio.c_lflag = ISIG|ICANON|ECHO|ECHOE|ECHOK|ECHOCTL|ECHOKE|IEXTEN;
-
-  if (raw) cfmakeraw(&termio);
-
-  return tcsetattr(fd, TCSANOW, &termio);
 }
 
 // Prompt with mesg, read password into buf, return 0 for success 1 for fail
@@ -128,9 +97,9 @@ static char *get_nextcolon(char *line, int cnt)
 }
 
 /*update_password is used by multiple utilities to update /etc/passwd,
- * /etc/shadow, /etc/group and /etc/gshadow files, 
+ * /etc/shadow, /etc/group and /etc/gshadow files,
  * which are used as user, group databeses
- * entry can be 
+ * entry can be
  * 1. encrypted password, when updating user password.
  * 2. complete entry for user details, when creating new user
  * 3. group members comma',' separated list, when adding user to group
@@ -197,7 +166,7 @@ int update_password(char *filename, char* username, char* entry)
           current_ptr = get_nextcolon(current_ptr, 1);
           fprintf(newfp, "%s\n",current_ptr);
         } else fprintf(newfp, "%s\n",current_ptr);
-      } else if (!strcmp(toys.which->name, "groupadd") || 
+      } else if (!strcmp(toys.which->name, "groupadd") ||
           !strcmp(toys.which->name, "addgroup") ||
           !strcmp(toys.which->name, "delgroup") ||
           !strcmp(toys.which->name, "groupdel")){

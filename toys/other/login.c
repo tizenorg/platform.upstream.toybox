@@ -4,6 +4,9 @@
  *
  * No support for PAM/securetty/selinux/login script/issue/utmp
  * Relies on libcrypt for hash calculation.
+ *
+ * TODO: this command predates "pending" but needs cleanup. It #defines
+ * random stuff, calls exit() form a signal handler... yeah.
 
 USE_LOGIN(NEWTOY(login, ">1fph:", TOYFLAG_BIN))
 
@@ -156,7 +159,7 @@ void login_main(void)
   if (!isatty(0) || !isatty(1) || !isatty(2)) error_exit("no tty");
 
   openlog("login", LOG_PID | LOG_CONS, LOG_AUTH);
-  signal(SIGALRM, login_timeout_handler);
+  xsignal(SIGALRM, login_timeout_handler);
   alarm(TT.login_timeout = 60);
 
   for (ss = forbid; *ss; ss++) unsetenv(*ss);
@@ -165,7 +168,7 @@ void login_main(void)
     tcflush(0, TCIFLUSH);
 
     username[sizeof(username)-1] = 0;
-    if (*toys.optargs) strncpy(username, *toys.optargs, sizeof(username)-1);
+    if (*toys.optargs) xstrncpy(username, *toys.optargs, sizeof(username));
     else {
       read_user(username, sizeof(username));
       if (!*username) continue;

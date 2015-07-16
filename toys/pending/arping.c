@@ -63,7 +63,7 @@ static void get_interface(char *interface, int *ifindex, uint32_t *oip,
   int fd = xsocket(AF_INET, SOCK_RAW, IPPROTO_RAW);
 
   req.ifr_addr.sa_family = AF_INET;
-  strncpy(req.ifr_name, interface, IFNAMSIZ);
+  xstrncpy(req.ifr_name, interface, IFNAMSIZ);
   req.ifr_name[IFNAMSIZ-1] = '\0';
 
   xioctl(fd, SIOCGIFFLAGS, &req);
@@ -116,18 +116,18 @@ static void send_packet()
 
   ptr = mempcpy(ptr, &src_pk.sll_addr, src_pk.sll_halen);
   ptr = mempcpy(ptr, &src_addr, 4);
-  if (toys.optflags & FLAG_A) 
-    ptr = mempcpy(ptr, &src_pk.sll_addr, src_pk.sll_halen);
-  else ptr = mempcpy(ptr, &dst_pk.sll_addr, src_pk.sll_halen);
-
+  ptr = mempcpy(ptr,
+                (toys.optflags & FLAG_A) ? &src_pk.sll_addr : &dst_pk.sll_addr,
+                src_pk.sll_halen);
   ptr = mempcpy(ptr, &dest_addr, 4);
+
   ret = sendto(TT.sockfd, sbuf, ptr - sbuf, 0, 
       (struct sockaddr *)&dst_pk, sizeof(dst_pk));
   if (ret == ptr - sbuf) {
     struct timeval tval;
 
     gettimeofday(&tval, NULL);
-    TT.sent_at = (tval.tv_sec * 1000000ULL + (tval.tv_usec));
+    TT.sent_at = tval.tv_sec * 1000000ULL + tval.tv_usec;
     TT.sent_nr++;
     if (!TT.unicast_flag) TT.brd_sent++;
   }
@@ -215,7 +215,7 @@ void arping_main(void)
   TT.sockfd = xsocket(AF_PACKET, SOCK_DGRAM, 0);
 
   memset(&ifr, 0, sizeof(ifr));
-  strncpy(ifr.ifr_name, TT.iface, IFNAMSIZ);
+  xstrncpy(ifr.ifr_name, TT.iface, IFNAMSIZ);
   get_interface(TT.iface, &if_index, NULL, NULL);
   src_pk.sll_ifindex = if_index;
 

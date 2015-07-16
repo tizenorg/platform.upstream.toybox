@@ -155,7 +155,7 @@ int mkpathat(int atfd, char *dir, mode_t lastmode, int flags)
       if (!(flags&2) || errno != EEXIST) return 1;
     } else if (flags&4)
       fprintf(stderr, "%s: created directory '%s'\n", toys.which->name, dir);
-    
+
     if (!(*s = save)) break;
   }
 
@@ -177,7 +177,7 @@ struct string_list **splitpath(char *path, struct string_list **list)
     if (len > 0) {
       *list = xmalloc(sizeof(struct string_list) + len + 1);
       (*list)->next = 0;
-      strncpy((*list)->str, new, len);
+      memcpy((*list)->str, new, len);
       (*list)->str[len] = 0;
       list = &(*list)->next;
     }
@@ -210,7 +210,8 @@ struct string_list *find_in_path(char *path, char *filename)
     if (!len) sprintf(rnext->str, "%s/%s", cwd, filename);
     else {
       char *res = rnext->str;
-      strncpy(res, path, len);
+
+      memcpy(res, path, len);
       res += len;
       *(res++) = '/';
       strcpy(res, filename);
@@ -232,13 +233,30 @@ struct string_list *find_in_path(char *path, char *filename)
   return rlist;
 }
 
+long estrtol(char *str, char **end, int base)
+{
+  errno = 0;
+
+  return strtol(str, end, base);
+}
+
+long xstrtol(char *str, char **end, int base)
+{
+  long l = estrtol(str, end, base);
+
+  if (errno) perror_exit("%s", str);
+
+  return l;
+}
+
 // atol() with the kilo/mega/giga/tera/peta/exa extensions.
 // (zetta and yotta don't fit in 64 bits.)
 long atolx(char *numstr)
 {
   char *c, *suffixes="cbkmgtpe", *end;
-  long val = strtol(numstr, &c, 0);
+  long val;
 
+  val = xstrtol(numstr, &c, 0);
   if (*c) {
     if (c != numstr && (end = strchr(suffixes, tolower(*c)))) {
       int shift = end-suffixes-2;
@@ -260,16 +278,6 @@ long atolx_range(char *numstr, long low, long high)
   if (val > high) error_exit("%ld > %ld", val, high);
 
   return val;
-}
-
-int numlen(long l)
-{
-  int len = 0;
-  while (l) {
-     l /= 10;
-     len++;
-  }
-  return len;
 }
 
 int stridx(char *haystack, char needle)
@@ -344,14 +352,12 @@ off_t fdlength(int fd)
 
 // Read contents of file as a single nul-terminated string.
 // malloc new one if buf=len=0
-char *readfile(char *name, char *ibuf, off_t len)
+char *readfileat(int dirfd, char *name, char *ibuf, off_t len)
 {
   int fd;
   char *buf;
 
-  fd = open(name, O_RDONLY);
-  if (fd == -1) return 0;
-
+  if (-1 == (fd = openat(dirfd, name, O_RDONLY))) return 0;
   if (len<1) {
     len = fdlength(fd);
     // proc files don't report a length, so try 1 page minimum.
@@ -368,6 +374,11 @@ char *readfile(char *name, char *ibuf, off_t len)
   } else buf[len] = 0;
 
   return buf;
+}
+
+char *readfile(char *name, char *ibuf, off_t len)
+{
+  return readfileat(AT_FDCWD, name, ibuf, len);
 }
 
 // Sleep for this many thousandths of a second
@@ -511,8 +522,7 @@ int copy_tempfile(int fdin, char *name, char **tempname)
   struct stat statbuf;
   int fd;
 
-  *tempname = xstrndup(name, strlen(name)+6);
-  strcat(*tempname,"XXXXXX");
+  *tempname = xmprintf("%s%s", name, "XXXXXX");
   if(-1 == (fd = mkstemp(*tempname))) error_exit("no temp file");
   if (!tempfile2zap) sigatexit(tempfile_handler);
   tempfile2zap = *tempname;
@@ -570,36 +580,19 @@ void crc_init(unsigned int *crc_table, int little_endian)
   }
 }
 
-// Quick and dirty query size of terminal, doesn't do ANSI probe fallback.
-// set x=80 y=25 before calling to provide defaults. Returns 0 if couldn't
-// determine size.
+// Init base64 table
 
-int terminal_size(unsigned *xx, unsigned *yy)
+void base64_init(char *p)
 {
-  struct winsize ws;
-  unsigned i, x = 0, y = 0;
-  char *s;
+  int i;
 
-  // stdin, stdout, stderr
-  for (i=0; i<3; i++) {
-    memset(&ws, 0, sizeof(ws));
-    if (!ioctl(i, TIOCGWINSZ, &ws)) {
-      if (ws.ws_col) x = ws.ws_col;
-      if (ws.ws_row) y = ws.ws_row;
-
-      break;
-    }
+  for (i = 'A'; i != ':'; i++) {
+    if (i == 'Z'+1) i = 'a';
+    if (i == 'z'+1) i = '0';
+    *(p++) = i;
   }
-  s = getenv("COLUMNS");
-  if (s) sscanf(s, "%u", &x);
-  s = getenv("ROWS");
-  if (s) sscanf(s, "%u", &y);
-
-  // Never return 0 for either value, leave it at default instead.
-  if (xx && x) *xx = x;
-  if (yy && y) *yy = y;
-
-  return x || y;
+  *(p++) = '+';
+  *(p++) = '/';
 }
 
 int yesno(char *prompt, int def)
@@ -670,8 +663,9 @@ int sig_to_num(char *pidstr)
 
   if (pidstr) {
     char *s;
-    i = strtol(pidstr, &s, 10);
-    if (!*s) return i;
+
+    i = estrtol(pidstr, &s, 10);
+    if (!errno && !*s) return i;
 
     if (!strncasecmp(pidstr, "sig", 3)) pidstr+=3;
   }
@@ -700,8 +694,8 @@ mode_t string_to_mode(char *modestr, mode_t mode)
 
   // Handle octal mode
   if (isdigit(*str)) {
-    mode = strtol(str, &s, 8);
-    if (*s || (mode & ~(07777))) goto barf;
+    mode = estrtol(str, &s, 8);
+    if (errno || *s || (mode & ~(07777))) goto barf;
 
     return mode | extrabits;
   }
@@ -804,6 +798,14 @@ void mode_to_string(mode_t mode, char *buf)
   *buf = c;
 }
 
+char *basename_r(char *name)
+{
+  char *s = strrchr(name, '/');
+
+  if (s) return s+1;
+  return name;
+}
+
 // Execute a callback for each PID that matches a process name from a list.
 void names_to_pid(char **names, int (*callback)(pid_t pid, char *name))
 {
@@ -822,7 +824,7 @@ void names_to_pid(char **names, int (*callback)(pid_t pid, char *name))
 
     for (curname = names; *curname; curname++)
       if (**curname == '/' ? !strcmp(cmd, *curname)
-          : !strcmp(basename(cmd), basename(*curname)))
+          : !strcmp(basename_r(cmd), basename_r(*curname)))
         if (callback(u, *curname)) break;
     if (*curname) break;
   }
@@ -835,8 +837,8 @@ int human_readable(char *buf, unsigned long long num)
 {
   int end, len;
 
-  len = sprintf(buf, "%lld", num);
-  end = ((len-1)%3)+1;
+  len = sprintf(buf, "%lld", num)-1;
+  end = (len%3)+1;
   len /= 3;
 
   if (len && end == 1) {
@@ -850,4 +852,24 @@ int human_readable(char *buf, unsigned long long num)
   buf[end++] = 0;
 
   return end;
+}
+
+// The qsort man page says you can use alphasort, the posix committee
+// disagreed, and doubled down: http://austingroupbugs.net/view.php?id=142
+// So just do our own. (The const is entirely to humor the stupid compiler.)
+int qstrcmp(const void *a, const void *b)
+{
+  return strcmp(*(char **)a, *(char **)b);
+}
+
+int xpoll(struct pollfd *fds, int nfds, int timeout)
+{
+  int i;
+
+  for (;;) {
+    if (0>(i = poll(fds, nfds, timeout))) {
+      if (errno != EINTR && errno != ENOMEM) perror_exit("xpoll");
+      else if (timeout>0) timeout--;
+    } else return i;
+  }
 }

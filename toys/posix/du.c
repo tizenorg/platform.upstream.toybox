@@ -3,6 +3,8 @@
  * Copyright 2012 Ashwini Kumar <ak.ashwini@gmail.com>
  *
  * See http://opengroup.org/onlinepubs/9699919799/utilities/du.html
+ *
+ * TODO: cleanup
 
 USE_DU(NEWTOY(du, "d#<0hmlcaHkKLsx[-HL][-kKmh]", TOYFLAG_USR|TOYFLAG_BIN))
 
@@ -104,11 +106,21 @@ static int seen_inode(void **list, struct stat *st)
 // dirtree callback, comput/display size of node
 static int do_du(struct dirtree *node)
 {
-  if (node->parent && !dirtree_notdotdot(node)) return 0;
+  if (!node->parent) TT.st_dev = node->st.st_dev;
+  else if (!dirtree_notdotdot(node)) return 0;
 
   // detect swiching filesystems
   if ((toys.optflags & FLAG_x) && (TT.st_dev != node->st.st_dev))
     return 0;
+
+  // Don't loop endlessly on recursive directory symlink
+  if (toys.optflags & FLAG_L) {
+    struct dirtree *try = node;
+
+    while ((try = try->parent))
+      if (node->st.st_dev==try->st.st_dev && node->st.st_ino==try->st.st_ino)
+        return 0;
+  }
 
   // Don't count hard links twice
   if (!(toys.optflags & FLAG_l) && !node->again)
@@ -118,7 +130,7 @@ static int do_du(struct dirtree *node)
   if (S_ISDIR(node->st.st_mode)) {
     if (!node->again) {
       TT.depth++;
-      return DIRTREE_COMEAGAIN | (DIRTREE_SYMFOLLOW*!!(toys.optflags & FLAG_L));
+      return DIRTREE_COMEAGAIN|(DIRTREE_SYMFOLLOW*!!(toys.optflags&FLAG_L));
     } else TT.depth--;
   }
 
@@ -137,21 +149,12 @@ static int do_du(struct dirtree *node)
 
 void du_main(void)
 {
-  char *noargs[] = {".", 0};
-  struct dirtree *root;
-
-  if (!toys.optc) toys.optargs = noargs;
+  char *noargs[] = {".", 0}, **args;
 
   // Loop over command line arguments, recursing through children
-  while (*toys.optargs) {
-    root = dirtree_add_node(0, *toys.optargs, toys.optflags & (FLAG_H|FLAG_L));
-
-    if (root) {
-      TT.st_dev = root->st.st_dev;
-      dirtree_handle_callback(root, do_du);
-    }
-    toys.optargs++;
-  }
+  for (args = toys.optc ? toys.optargs : noargs; *args; args++)
+    dirtree_handle_callback(dirtree_start(*args, toys.optflags&(FLAG_H|FLAG_L)),
+      do_du);
   if (toys.optflags & FLAG_c) print(TT.total*512, 0);
 
   if (CFG_TOYBOX_FREE) seen_inode(TT.inodes, 0);

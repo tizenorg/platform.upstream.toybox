@@ -17,7 +17,6 @@
 #include <grp.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <libgen.h>
 #include <math.h>
 #include <pwd.h>
 #include <regex.h>
@@ -37,7 +36,6 @@
 #include <sys/statvfs.h>
 #include <sys/time.h>
 #include <sys/times.h>
-#include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <syslog.h>
@@ -69,14 +67,14 @@
 #include <sys/sysinfo.h>
 
 #include "lib/lib.h"
+#include "lib/lsm.h"
 #include "toys/e2fs.h"
 
 // Get list of function prototypes for all enabled command_main() functions.
 
 #define NEWTOY(name, opts, flags) void name##_main(void);
-#define OLDTOY(name, oldname, opts, flags) void oldname##_main(void);
+#define OLDTOY(name, oldname, flags) void oldname##_main(void);
 #include "generated/newtoys.h"
-#include "generated/oldtoys.h"
 #include "generated/flags.h"
 #include "generated/globals.h"
 

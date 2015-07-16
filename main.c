@@ -5,12 +5,17 @@
 
 #include "toys.h"
 
+#ifndef TOYBOX_VERSION
+#define TOYBOX_VERSION "0.5.2"
+#endif
+
 // Populate toy_list[].
 
 #undef NEWTOY
 #undef OLDTOY
 #define NEWTOY(name, opts, flags) {#name, name##_main, opts, flags},
-#define OLDTOY(name, oldname, opts, flags) {#name, oldname##_main, opts, flags},
+#define OLDTOY(name, oldname, flags) \
+  {#name, oldname##_main, OPTSTR_##oldname, flags},
 
 struct toy_list toy_list[] = {
 #include "generated/newtoys.h"
@@ -57,7 +62,7 @@ struct toy_list *toy_find(char *name)
 #undef NEWTOY
 #undef OLDTOY
 #define NEWTOY(name, opts, flags) opts ||
-#define OLDTOY(name, oldname, opts, flags) opts ||
+#define OLDTOY(name, oldname, flags) OPTSTR_##oldname ||
 static const int NEED_OPTIONS =
 #include "generated/newtoys.h"
 0;  // Ends the opts || opts || opts...
@@ -115,6 +120,7 @@ void toy_init(struct toy_list *which, char *argv[])
 
   if (toys.optargs != toys.argv+1) free(toys.optargs);
   memset(&toys, 0, offsetof(struct toy_context, rebound));
+  if (toys.recursion > 1) memset(&this, 0, sizeof(this));
 
   // Subset of init needed by singlemain.
   toy_singleinit(which, argv);
@@ -132,10 +138,12 @@ void toy_exec(char *argv[])
   if (toys.recursion && (which->flags & TOYFLAG_ROOTONLY) && getuid()) return;
   if (toys.recursion++ > 5) return;
 
+  // don't blank old optargs if our new argc lives in the old optargs.
+  if (argv>=toys.optargs && argv<=toys.optargs+toys.optc) toys.optargs = 0;
+
   // Run command
   toy_init(which, argv);
   if (toys.which) toys.which->toy_main();
-  if (fflush(NULL) || ferror(stdout)) perror_exit("write");
   xexit();
 }
 
@@ -149,14 +157,15 @@ void toybox_main(void)
 
   toys.which = toy_list;
   if (toys.argv[1]) {
-    toys.optc = 0;
+    toys.optc = toys.recursion = 0;
     toy_exec(toys.argv+1);
-    if (toys.argv[1][0] == '-') goto list;
-    
-    error_exit("Unknown command %s",toys.argv[1]);
+    if (!strcmp("--version", toys.argv[1])) {
+      xputs(TOYBOX_VERSION);
+      xexit();
+    }
+    if (toys.argv[1][0] != '-') error_exit("Unknown command %s", toys.argv[1]);
   }
 
-list:
   // Output list of command.
   for (i=1; i<ARRAY_LEN(toy_list); i++) {
     int fl = toy_list[i].flags;
@@ -176,6 +185,9 @@ list:
 
 int main(int argc, char *argv[])
 {
+  // We check our own stdout errors, disable sigpipe killer
+  signal(SIGPIPE, SIG_IGN);
+
   if (CFG_TOYBOX) {
     // Trim path off of command name
     *argv = basename(*argv);
@@ -188,8 +200,7 @@ int main(int argc, char *argv[])
     // a single toybox command built standalone with no multiplexer
     toy_singleinit(toy_list, argv);
     toy_list->toy_main();
-    if (fflush(NULL) || ferror(stdout)) perror_exit("write");
   }
 
-  return toys.exitval;
+  xexit();
 }

@@ -4,8 +4,8 @@
  *
  * TODO: udp, ipv6, genericize for telnet/microcom/tail-f
 
-USE_NETCAT(OLDTOY(nc, netcat, USE_NETCAT_LISTEN("tl^L^")"w#p#s:q#f:", TOYFLAG_BIN))
-USE_NETCAT(NEWTOY(netcat, USE_NETCAT_LISTEN("tl^L^")"w#p#s:q#f:", TOYFLAG_BIN))
+USE_NETCAT(OLDTOY(nc, netcat, TOYFLAG_USR|TOYFLAG_BIN))
+USE_NETCAT(NEWTOY(netcat, USE_NETCAT_LISTEN("^tlL")"w#p#s:q#f:", TOYFLAG_BIN))
 
 config NETCAT
   bool "netcat"
@@ -55,12 +55,13 @@ GLOBALS(
 static void timeout(int signum)
 {
   if (TT.wait) error_exit("Timeout");
+  // This should be xexit() but would need siglongjmp()...
   exit(0);
 }
 
 static void set_alarm(int seconds)
 {
-  signal(SIGALRM, seconds ? timeout : SIG_DFL);
+  xsignal(SIGALRM, seconds ? timeout : SIG_DFL);
   alarm(seconds);
 }
 
@@ -186,7 +187,7 @@ void netcat_main(void)
   set_alarm(0);
 
   if (CFG_NETCAT_LISTEN && (toys.optflags&(FLAG_L|FLAG_l) && toys.optc))
-    xexec_optargs(0);
+    xexec(toys.optargs);
 
   // Poll loop copying stdin->socket and socket->stdout.
   for (;;) {

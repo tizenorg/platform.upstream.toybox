@@ -41,7 +41,7 @@ char *comma_iterate(char **list, int *len)
   return start;
 }
 
-static void deslash(char *s)
+static void octal_deslash(char *s)
 {
   char *o = s;
 
@@ -78,7 +78,7 @@ int comma_scan(char *optlist, char *opt, int clean)
     no = 2*(*s == 'n' && s[1] == 'o');
     if (optlen == len-no && !strncmp(opt, s+no, optlen)) {
       got = !no;
-      if (clean) memmove(s, optlist, strlen(optlist)+1);
+      if (clean && optlist) memmove(s, optlist, strlen(optlist)+1);
     }
   }
 
@@ -90,7 +90,7 @@ int comma_scanall(char *optlist, char *scanlist)
 {
   int i = 1;
 
-  for (;;) {
+  while (scanlist && *scanlist) {
     char *opt = comma_iterate(&scanlist, &i), *s = xstrndup(opt, i);
 
     i = comma_scan(optlist, s, 0);
@@ -165,8 +165,8 @@ struct mtab_list *xgetmountlist(char *path)
     mt->opts = stpcpy(mt->device, me->mnt_fsname)+1;
     strcpy(mt->opts, me->mnt_opts);
 
-    deslash(mt->dir);
-    deslash(mt->device);
+    octal_deslash(mt->dir);
+    octal_deslash(mt->device);
   }
   endmntent(fp);
 
