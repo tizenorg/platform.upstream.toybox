@@ -86,6 +86,10 @@ testing()
   echo -ne "$5" | eval "$2" > actual
   RETVAL=$?
 
+  # Catch segfaults
+  [ $RETVAL -gt 128 ] && [ $RETVAL -lt 255 ] &&
+    echo "exited with signal (or returned $RETVAL)" >> actual
+ 
   cmp expected actual > /dev/null 2>&1
   if [ $? -ne 0 ]
   then
@@ -95,7 +99,7 @@ testing()
     then
       [ ! -z "$4" ] && echo "echo -ne \"$4\" > input"
       echo "echo -ne '$5' | $2"
-      diff -u expected actual
+      diff -au expected actual
       [ "$VERBOSE" == fail ] && exit 1
     fi
   else

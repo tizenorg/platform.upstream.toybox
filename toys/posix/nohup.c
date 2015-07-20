@@ -21,7 +21,7 @@ config NOHUP
 
 void nohup_main(void)
 {
-  signal(SIGHUP, SIG_IGN);
+  xsignal(SIGHUP, SIG_IGN);
   if (isatty(1)) {
     close(1);
     if (-1 == open("nohup.out", O_CREAT|O_APPEND|O_WRONLY,
@@ -38,5 +38,5 @@ void nohup_main(void)
     close(0);
     open("/dev/null", O_RDONLY);
   }
-  xexec_optargs(0);
+  xexec(toys.optargs);
 }

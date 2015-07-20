@@ -1,6 +1,8 @@
 /* modinfo.c - Display module info
  *
  * Copyright 2012 Andre Renaud <andre@bluewatersys.com>
+ *
+ * TODO: cleanup
 
 USE_MODINFO(NEWTOY(modinfo, "<1b:k:F:0", TOYFLAG_BIN))
 
@@ -27,7 +29,7 @@ GLOBALS(
 
 static void output_field(char *field, char *value)
 {
-  if (!TT.field) xprintf("%s:%*c", field, 15 - strlen(field), ' ');
+  if (!TT.field) xprintf("%s:%*c", field, 15-(int)strlen(field), ' ');
   else if (strcmp(TT.field, field)) return;
   xprintf("%s", value);
   xputc((toys.optflags & FLAG_0) ? 0 : '\n');

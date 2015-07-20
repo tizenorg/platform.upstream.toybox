@@ -6,7 +6,7 @@
  *
  * Not in SUSv4.
 
-USE_IFCONFIG(NEWTOY(ifconfig, "^?a", TOYFLAG_BIN))
+USE_IFCONFIG(NEWTOY(ifconfig, "^?a", TOYFLAG_SBIN))
 
 config IFCONFIG
   bool "ifconfig"
@@ -123,7 +123,7 @@ static void display_ifconfig(char *name, int always, unsigned long long val[])
   xprintf("%-9s Link encap:%s  ", name, types[i].title);
   if(i >= 0 && ifre.ifr_hwaddr.sa_family == ARPHRD_ETHER) {
     xprintf("HWaddr ");
-    for (i=0; i<6; i++) xprintf(":%02X"+!i, ifre.ifr_hwaddr.sa_data[i]);
+    for (i=0; i<6; i++) xprintf(":%02x"+!i, ifre.ifr_hwaddr.sa_data[i]);
   }
   xputc('\n');
 
@@ -254,7 +254,7 @@ static void display_ifconfig(char *name, int always, unsigned long long val[])
     xprintf("%10c", ' ');
     if(ifre.ifr_map.irq) xprintf("Interrupt:%d ", ifre.ifr_map.irq);
     if(ifre.ifr_map.base_addr >= 0x100) // IO_MAP_INDEX
-      xprintf("Base address:0x%lx ", ifre.ifr_map.base_addr);
+      xprintf("Base address:0x%x ", ifre.ifr_map.base_addr);
     if(ifre.ifr_map.mem_start)
       xprintf("Memory:%lx-%lx ", ifre.ifr_map.mem_start, ifre.ifr_map.mem_end);
     if(ifre.ifr_map.dma) xprintf("DMA chan:%x ", ifre.ifr_map.dma);
@@ -449,7 +449,7 @@ void ifconfig_main(void)
 
       if (!argv[1]) {
         toys.exithelp++;
-        error_exit(*argv);
+        error_exit("%s", *argv);
       }
 
       plen = get_addrinfo(argv[1], AF_INET6, &ifre6.addr);
@@ -462,7 +462,7 @@ void ifconfig_main(void)
       close(fd6);
       continue;
     // Iterate through table to find/perform operation
-    } else for (i = 0; i < sizeof(try)/sizeof(*try); i++) {
+    } else for (i = 0; i < ARRAY_LEN(try); i++) {
       struct argh *t = try+i;
       int on = t->on, off = t->off;
 
@@ -485,7 +485,7 @@ void ifconfig_main(void)
             poke((on>>16) + (char *)&ifre, l, on&15);
             xioctl(TT.sockfd, off, &ifre);
             break;
-          } else if (t->name || !strchr(ifre.ifr_name, ':')) {
+          } else {
             struct sockaddr_in *si = (struct sockaddr_in *)&ifre.ifr_addr;
             int mask = -1;
 

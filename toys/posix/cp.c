@@ -4,13 +4,12 @@
  *
  * Posix says "cp -Rf dir file" shouldn't delete file, but our -f does.
 
-// This is subtle: MV options must be in same order (right to left) as CP
-// for FLAG_X macros to work out right.
+// options shared between mv/cp must be in same order (right to left)
+// for FLAG macros to work out right in shared infrastructure.
 
-USE_CP(NEWTOY(cp, "<2RHLPp"USE_CP_MORE("rdaslvnF")"fi[-HLPd]"USE_CP_MORE("[-ni]"), TOYFLAG_BIN))
-USE_CP_MV(OLDTOY(mv, cp, "<2"USE_CP_MORE("vnF")"fi"USE_CP_MORE("[-ni]"), TOYFLAG_BIN))
+USE_CP(NEWTOY(cp, "<2"USE_CP_PRESERVE("(preserve):;")"RHLPp"USE_CP_MORE("rdaslvnF(remove-destination)")"fi[-HLP"USE_CP_MORE("d")"]"USE_CP_MORE("[-ni]"), TOYFLAG_BIN))
+USE_MV(NEWTOY(mv, "<2"USE_CP_MORE("vnF")"fi"USE_CP_MORE("[-ni]"), TOYFLAG_BIN))
 USE_INSTALL(NEWTOY(install, "<1cdDpsvm:o:g:", TOYFLAG_USR|TOYFLAG_BIN))
-*
 
 config CP
   bool "cp"
@@ -22,7 +21,7 @@ config CP
     be a directory.
 
     -f	delete destination files we can't write to
-    -F	delete any existing destination file first (breaks hardlinks)
+    -F	delete any existing destination file first (--remove-destination)
     -i	interactive, prompt before overwriting existing DEST
     -p	preserve timestamps, ownership, and permissions
     -R	recurse into subdirectories (DEST must be a directory)
@@ -45,7 +44,22 @@ config CP_MORE
     -s	symlink instead of copy
     -v	verbose
 
-config CP_MV
+config CP_PRESERVE
+  bool "cp --preserve support"
+  default y
+  depends on CP_MORE
+  help
+    usage: cp [--preserve=mota]
+
+    --preserve takes either a comma separated list of attributes, or the first
+    letter(s) of:
+
+            mode - permissions (ignore umask for rwx, copy suid and sticky bit)
+       ownership - user and group
+      timestamps - file creation, modification, and access times.
+             all - all of the above
+
+config MV
   bool "mv"
   default y
   depends on CP
@@ -55,10 +69,10 @@ config CP_MV
     -f	force copy by deleting destination file
     -i	interactive, prompt before overwriting existing DEST
 
-config CP_MV_MORE
+config MV_MORE
   bool
   default y
-  depends on CP_MV && CP_MORE
+  depends on MV && CP_MORE
   help
     usage: mv [-vn]
 
@@ -85,25 +99,27 @@ config INSTALL
 */
 
 #define FOR_cp
-#ifdef USE_SMACK
-#include <sys/smack.h>
-#endif //USE_SMACK
-
-#include <sys/xattr.h>
-
 #include "toys.h"
 
 GLOBALS(
-  // install's options
-  char *group;
-  char *user;
-  char *mode;
+  union {
+    struct {
+      // install's options
+      char *group;
+      char *user;
+      char *mode;
+    } i;
+    struct {
+      char *preserve;
+    } c;
+  };
 
   char *destname;
   struct stat top;
   int (*callback)(struct dirtree *try);
   uid_t uid;
   gid_t gid;
+  int pflags;
 )
 
 // Callback from dirtree_read() for each file/directory under a source dir.
@@ -214,7 +230,7 @@ int cp_node(struct dirtree *try)
 
         if (*or->name == '/') dotdots = 0;
         if (dotdots) {
-          char *s2 = xmprintf("% *c%s", 3*dotdots, ' ', s);
+          char *s2 = xmprintf("%*c%s", 3*dotdots, ' ', s);
           free(s);
           s = s2;
           while(dotdots--) {
@@ -252,98 +268,55 @@ int cp_node(struct dirtree *try)
         if (fdin < 0) {
           catch = try->name;
           break;
-        } else {
-          fdout = openat(cfd, catch, O_RDWR|O_CREAT|O_TRUNC, try->st.st_mode);
-          if (fdout >= 0) {
-            xsendfile(fdin, fdout);
-
-            // Duplicate xattrs for new file
-            if (flags & FLAG_p) {
-              ssize_t buffer_len = flistxattr(fdin, NULL, 0);
-
-              if (buffer_len > 0) {
-                char *xattrs_buffer = malloc(buffer_len);
-
-                // If we don't succeed, then we don't copy the xattrs
-                if (xattrs_buffer != NULL) {
-                  buffer_len = flistxattr(fdin, xattrs_buffer, buffer_len);
-                  char *tmp_buffer = xattrs_buffer;
-
-                  while (buffer_len > 0) {
-                    int len = strlen(tmp_buffer)+1;
-                    char *xattr_value = NULL;
-                    //Fetch size of xattr value
-                    ssize_t xattr_len = fgetxattr(fdin, tmp_buffer, xattr_value, 0);
-
-                    if (xattr_len == -1)
-                      goto exit_xattr;
-
-                    errno = 0;
-                    xattr_value = malloc(xattr_len);
-
-                    if (xattr_value == NULL)
-                      goto exit_xattr;
-
-                    xattr_len = fgetxattr(fdin, tmp_buffer, xattr_value, xattr_len);
-
-                    if (xattr_len == -1) {
-                      free(xattr_value);
-                      goto exit_xattr;
-                    }
-
-                    int ret = fsetxattr(fdout, tmp_buffer, xattr_value, xattr_len, 0);
-                    free(xattr_value);
-
-                    if (ret == -1) {
-                      //Something failed, we cannot fix it anyway, hence we break the loop
-                      fprintf(stderr, "cp: cannot apply extended attributes, \
-                        probably not supported by target filesystem");
-                      break;
-                    };
-
-                    tmp_buffer += len;
-                    buffer_len -= len;
-                  }
-
-exit_xattr:
-                free(xattrs_buffer);
-                errno = 0;
-                }
-              }
-            }
-            err = 0;
-          }
-          close(fdin);
         }
+        fdout = openat(cfd, catch, O_RDWR|O_CREAT|O_TRUNC, try->st.st_mode);
+        if (fdout >= 0) {
+          xsendfile(fdin, fdout);
+          err = 0;
+        }
+        close(fdin);
       }
     } while (err && (flags & (FLAG_f|FLAG_n)) && !unlinkat(cfd, catch, 0));
   }
 
+  // Did we make a thing?
   if (fdout != -1) {
-    if (flags & (FLAG_a|FLAG_p)) {
-      struct timespec times[2];
+    int rc;
 
-      // Inability to set these isn't fatal, some require root access.
+    // Inability to set --preserve isn't fatal, some require root access.
 
-      times[0] = try->st.st_atim;
-      times[1] = try->st.st_mtim;
+    // ownership
+    if (TT.pflags & 2) {
 
+      // permission bits already correct for mknod and don't apply to symlink
       // If we can't get a filehandle to the actual object, use racy functions
-      if (fdout == AT_FDCWD) {
-        fchownat(cfd, catch, try->st.st_uid, try->st.st_gid,
-                 AT_SYMLINK_NOFOLLOW);
-        utimensat(cfd, catch, times, AT_SYMLINK_NOFOLLOW);
-        // permission bits already correct for mknod, don't apply to symlink
-      } else {
-        fchown(fdout, try->st.st_uid, try->st.st_gid);
-        futimens(fdout, times);
-        fchmod(fdout, try->st.st_mode);
+      if (fdout == AT_FDCWD)
+        rc = fchownat(cfd, catch, try->st.st_uid, try->st.st_gid,
+                      AT_SYMLINK_NOFOLLOW);
+      else rc = fchown(fdout, try->st.st_uid, try->st.st_gid);
+      if (rc) {
+        char *pp;
+
+        perror_msg("chown '%s'", pp = dirtree_path(try, 0));
+        free(pp);
       }
     }
 
-    if (fdout != AT_FDCWD) xclose(fdout);
+    // timestamp
+    if (TT.pflags & 4) {
+      struct timespec times[] = {try->st.st_atim, try->st.st_mtim};
 
-    if (CFG_CP_MV && toys.which->name[0] == 'm')
+      if (fdout == AT_FDCWD) utimensat(cfd, catch, times, AT_SYMLINK_NOFOLLOW);
+      else futimens(fdout, times);
+    }
+
+    // mode comes last because other syscalls can strip suid bit
+    if (fdout != AT_FDCWD) {
+      if (TT.pflags & 1) fchmod(fdout, try->st.st_mode);
+      xclose(fdout);
+    }
+
+    if (CFG_MV && toys.which->name[0] == 'm')
       if (unlinkat(tfd, try->name, S_ISDIR(try->st.st_mode) ? AT_REMOVEDIR :0))
         err = "%s";
   }
@@ -354,17 +327,41 @@ exit_xattr:
 
 void cp_main(void)
 {
-  char *destname = toys.optargs[--toys.optc];
+  char *destname = toys.optargs[--toys.optc],
+       *preserve[] = {"mode", "ownership", "timestamps"};
   int i, destdir = !stat(destname, &TT.top) && S_ISDIR(TT.top.st_mode);
 
   if (toys.optc>1 && !destdir) error_exit("'%s' not directory", destname);
-  if (toys.which->name[0] == 'm') toys.optflags |= FLAG_d|FLAG_p|FLAG_R;
-  if (toys.optflags & (FLAG_a|FLAG_p)) umask(0);
 
+  if (toys.optflags & (FLAG_a|FLAG_p)) {
+    TT.pflags = 7; // preserve=mot
+    umask(0);
+  }
+  if (CFG_CP_PRESERVE && TT.c.preserve) {
+    char *pre = xstrdup(TT.c.preserve), *s;
+
+    if (comma_scan(pre, "all", 1)) TT.pflags = ~0;
+    for (i=0; i<ARRAY_LEN(preserve); i++)
+      if (comma_scan(pre, preserve[i], 1)) TT.pflags |= 1<<i;
+    if (*pre) {
+
+      // Try to interpret as letters, commas won't set anything this doesn't.
+      for (s = TT.c.preserve; *s; s++) {
+        for (i=0; i<ARRAY_LEN(preserve); i++)
+          if (*s == *preserve[i]) TT.pflags |= 1<<i;
+        if (i == ARRAY_LEN(preserve)) {
+          if (*s == 'a') TT.pflags = ~0;
+          else break;
+        }
+      }
+
+      if (*s) error_exit("bad --preserve=%s", pre);
+    }
+    free(pre);
+  }
   if (!TT.callback) TT.callback = cp_node;
 
   // Loop through sources
-
   for (i=0; i<toys.optc; i++) {
     struct dirtree *new;
     char *src = toys.optargs[i];
@@ -374,7 +371,7 @@ void cp_main(void)
     else TT.destname = destname;
 
     errno = EXDEV;
-    if (CFG_CP_MV && toys.which->name[0] == 'm') {
+    if (CFG_MV && toys.which->name[0] == 'm') {
       if (!(toys.optflags & FLAG_f)) {
         struct stat st;
 
@@ -394,14 +391,20 @@ void cp_main(void)
 
     // Skip nonexistent sources
     if (rc) {
-      int symfollow = toys.optflags & (FLAG_H|FLAG_L);
-
-      if (errno != EXDEV || !(new = dirtree_add_node(0, src, symfollow)))
+      if (errno!=EXDEV ||
+        !(new = dirtree_start(src, toys.optflags&(FLAG_H|FLAG_L))))
           perror_msg("bad '%s'", src);
       else dirtree_handle_callback(new, TT.callback);
     }
     if (destdir) free(TT.destname);
   }
+}
+
+void mv_main(void)
+{
+  toys.optflags |= FLAG_d|FLAG_p|FLAG_R;
+
+  cp_main();
 }
 
 #define CLEANUP_cp
@@ -410,9 +413,9 @@ void cp_main(void)
 
 static int install_node(struct dirtree *try)
 {
-  if (TT.mode) try->st.st_mode = string_to_mode(TT.mode, try->st.st_mode);
-  if (TT.group) try->st.st_gid = TT.gid;
-  if (TT.user) try->st.st_uid = TT.uid;
+  if (TT.i.mode) try->st.st_mode = string_to_mode(TT.i.mode, try->st.st_mode);
+  if (TT.i.group) try->st.st_gid = TT.gid;
+  if (TT.i.user) try->st.st_uid = TT.uid;
 
   // Always returns 0 because no -r
   cp_node(try);
@@ -439,6 +442,7 @@ void install_main(void)
   }
 
   if (toys.optflags & FLAG_D) {
+    TT.destname = toys.optargs[toys.optc-1];
     if (mkpathat(AT_FDCWD, TT.destname, 0, 2))
       perror_exit("-D '%s'", TT.destname);
     if (toys.optc == 1) return;
@@ -450,8 +454,8 @@ void install_main(void)
   if (flags & FLAG_v) toys.optflags |= 8; // cp's FLAG_v
   if (flags & (FLAG_p|FLAG_o|FLAG_g)) toys.optflags |= 512; // cp's FLAG_p
 
-  if (TT.user) TT.uid = xgetpwnam(TT.user)->pw_uid;
-  if (TT.group) TT.gid = xgetgrnam(TT.group)->gr_gid;
+  if (TT.i.user) TT.uid = xgetpwnamid(TT.i.user)->pw_uid;
+  if (TT.i.group) TT.gid = xgetgrnamid(TT.i.group)->gr_gid;
 
   TT.callback = install_node;
   cp_main();

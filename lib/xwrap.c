@@ -9,15 +9,29 @@
 
 #include "toys.h"
 
-// Strcpy with size checking: exit if there's not enough space for the string.
+// strcpy and strncat with size checking. Size is the total space in "dest",
+// including null terminator. Exit if there's not enough space for the string
+// (including space for the null terminator), because silently truncating is
+// still broken behavior. (And leaving the string unterminated is INSANE.)
 void xstrncpy(char *dest, char *src, size_t size)
 {
   if (strlen(src)+1 > size) error_exit("'%s' > %ld bytes", src, (long)size);
   strcpy(dest, src);
 }
 
+void xstrncat(char *dest, char *src, size_t size)
+{
+  long len = strlen(src);
+
+  if (len+strlen(dest)+1 > size)
+    error_exit("'%s%s' > %ld bytes", dest, src, (long)size);
+  strcpy(dest+len, src);
+}
+
 void xexit(void)
 {
+  if (fflush(NULL) || ferror(stdout))
+    if (!toys.exitval) perror_msg("write");
   if (toys.rebound) longjmp(*toys.rebound, 1);
   else exit(toys.exitval);
 }
@@ -52,9 +66,10 @@ void *xrealloc(void *ptr, size_t size)
 // Die unless we can allocate a copy of this many bytes of string.
 char *xstrndup(char *s, size_t n)
 {
-  char *ret = xmalloc(++n);
-  strncpy(ret, s, n);
-  ret[--n]=0;
+  char *ret = strndup(s, ++n);
+
+  if (!ret) error_exit("xstrndup");
+  ret[--n] = 0;
 
   return ret;
 }
@@ -113,26 +128,6 @@ void xflush(void)
 {
   if (fflush(stdout) || ferror(stdout)) perror_exit("write");;
 }
-
-pid_t xfork(void)
-{
-  pid_t pid = fork();
-
-  if (pid < 0) perror_exit("fork");
-
-  return pid;
-}
-
-// Call xexec with a chunk of optargs, starting at skip. (You can't just
-// call xexec() directly because toy_init() frees optargs.)
-void xexec_optargs(int skip)
-{
-  char **s = toys.optargs;
-
-  toys.optargs = 0;
-  xexec(s+skip);
-}
-
 
 // Die unless we can exec argv[] (or run builtin command).  Note that anything
 // with a path isn't a builtin, so /bin/sh won't match the builtin sh.
@@ -343,7 +338,7 @@ void xstat(char *path, struct stat *st)
 
 // Cannonicalize path, even to file with one or more missing components at end.
 // if exact, require last path component to exist
-char *xabspath(char *path, int exact) 
+char *xabspath(char *path, int exact)
 {
   struct string_list *todo, *done = 0;
   int try = 9999, dirfd = open("/", 0);;
@@ -482,6 +477,38 @@ struct group *xgetgrgid(gid_t gid)
   return group;
 }
 
+struct passwd *xgetpwnamid(char *user)
+{
+  struct passwd *up = getpwnam(user);
+  uid_t uid;
+
+  if (!up) {
+    char *s = 0;
+
+    uid = estrtol(user, &s, 10);
+    if (!errno && s && !*s) up = getpwuid(uid);
+  }
+  if (!up) perror_exit("user '%s'", user);
+
+  return up;
+}
+
+struct group *xgetgrnamid(char *group)
+{
+  struct group *gr = getgrnam(group);
+  gid_t gid;
+
+  if (!gr) {
+    char *s = 0;
+
+    gid = estrtol(group, &s, 10);
+    if (!errno && s && !*s) gr = getgrgid(gid);
+  }
+  if (!gr) perror_exit("group '%s'", group);
+
+  return gr;
+}
+
 struct passwd *xgetpwnam(char *name)
 {
   struct passwd *up = getpwnam(name);
@@ -587,13 +614,12 @@ void xpidfile(char *name)
 void xsendfile(int in, int out)
 {
   long len;
-  char buf[4096];
 
   if (in<0) return;
   for (;;) {
-    len = xread(in, buf, 4096);
+    len = xread(in, libbuf, sizeof(libbuf));
     if (len<1) break;
-    xwrite(out, buf, len);
+    xwrite(out, libbuf, len);
   }
 }
 
@@ -605,7 +631,7 @@ long xparsetime(char *arg, long units, long *fraction)
 
   if (CFG_TOYBOX_FLOAT) d = strtod(arg, &arg);
   else l = strtoul(arg, &arg, 10);
-  
+
   // Parse suffix
   if (*arg) {
     int ismhd[]={1,60,3600,86400}, i = stridx("smhd", *arg);
@@ -632,4 +658,26 @@ void xregcomp(regex_t *preg, char *regex, int cflags)
     regerror(rc, preg, libbuf, sizeof(libbuf));
     error_exit("xregcomp: %s", libbuf);
   }
+}
+
+char *xtzset(char *new)
+{
+  char *tz = getenv("TZ");
+
+  if (tz) tz = xstrdup(tz);
+  if (setenv("TZ", new, 1)) perror_exit("setenv");
+  tzset();
+
+  return tz;
+}
+
+// Set a signal handler
+void xsignal(int signal, void *handler)
+{
+  struct sigaction *sa = (void *)libbuf;
+
+  memset(sa, 0, sizeof(struct sigaction));
+  sa->sa_handler = handler;
+
+  if (sigaction(signal, sa, 0)) perror_exit("xsignal %d", signal);
 }

@@ -5,7 +5,7 @@
  *
  * No Standard
 
-USE_RFKILL(NEWTOY(rfkill, "<1>2", TOYFLAG_SBIN))
+USE_RFKILL(NEWTOY(rfkill, "<1>2", TOYFLAG_USR|TOYFLAG_SBIN))
 
 config RFKILL
   bool "rfkill"
@@ -49,7 +49,7 @@ void rfkill_main(void)
       {"wimax", RFKILL_TYPE_WIMAX}, {"wwan", RFKILL_TYPE_WWAN},
       {"gps", RFKILL_TYPE_GPS}, {"fm", 7}}; // RFKILL_TYPE_FM = 7
 
-    if (!*++optargs) error_exit("'%s' needs IDENTIFIER");
+    if (!*++optargs) error_exit("'%s' needs IDENTIFIER", optargs[-1]);
     for (i = 0; i < ARRAY_LEN(rftypes); i++)
       if (!strcmp(rftypes[i].name, *optargs)) break;
     if (i == ARRAY_LEN(rftypes)) idx = atolx_range(*optargs, 0, INT_MAX);

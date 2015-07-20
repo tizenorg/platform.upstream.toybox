@@ -8,7 +8,7 @@
 // things like prototype "nbd-client_main" which isn't a valid symbol. So
 // we hide the underscore name and OLDTOY the name we want.
 USE_NBD_CLIENT(NEWTOY(nbd_client, "<3>3ns", 0))
-USE_NBD_CLIENT(OLDTOY(nbd-client, nbd_client, OPTSTR_nbd_client, TOYFLAG_USR|TOYFLAG_BIN))
+USE_NBD_CLIENT(OLDTOY(nbd-client, nbd_client, TOYFLAG_USR|TOYFLAG_BIN))
 
 config NBD_CLIENT
   bool "nbd-client"
@@ -112,7 +112,7 @@ void nbd_client_main(void)
 
     // Daemonize here.
 
-    daemon(0,0);
+    if (daemon(0,0)) perror_exit("daemonize");
 
     // Process NBD requests until further notice.
 

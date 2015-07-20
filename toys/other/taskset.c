@@ -3,6 +3,17 @@
  * Copyright 2012 Elie De Brauwer <eliedebrauwer@gmail.com>
 
 USE_TASKSET(NEWTOY(taskset, "<1^pa", TOYFLAG_BIN|TOYFLAG_STAYROOT))
+USE_NPROC(NEWTOY(nproc, "(all)", TOYFLAG_USR|TOYFLAG_BIN))
+
+config NPROC
+  bool "nproc"
+  default y
+  help
+    usage: nproc [--all]
+
+    Print number of processors.
+
+    --all	Show all processors, not just ones this task can run on.
 
 config TASKSET
   bool "taskset"
@@ -28,6 +39,10 @@ config TASKSET
   syscall(__NR_sched_setaffinity, (pid_t)pid, (size_t)size, (void *)cpuset)
 #define sched_getaffinity(pid, size, cpuset) \
   syscall(__NR_sched_getaffinity, (pid_t)pid, (size_t)size, (void *)cpuset)
+
+GLOBALS(
+  int nproc;
+)
 
 // mask is an array of long, which makes the layout a bit weird on big
 // endian systems but as long as it's consistent...
@@ -90,7 +105,7 @@ void taskset_main(void)
   if (!(toys.optflags & FLAG_p)) {
     if (toys.optc < 2) error_exit("Needs 2 args");
     do_taskset(getpid(), 1);
-    xexec_optargs(1);
+    xexec(toys.optargs+1);
   } else {
     char *c;
     pid_t pid = strtol(toys.optargs[toys.optc-1], &c, 10);
@@ -103,4 +118,31 @@ void taskset_main(void)
       dirtree_read(buf, task_callback);
     } else do_taskset(pid, 0);
   }
+}
+
+int do_nproc(struct dirtree *new)
+{
+  if (!new->parent) return DIRTREE_RECURSE;
+  if (!strncmp(new->name, "cpu", 3) && isdigit(new->name[3])) TT.nproc++;
+
+  return 0;
+}
+
+void nproc_main(void)
+{
+  int i, j;
+
+  // This can only detect 32768 processors. Call getaffinity and count bits.
+  if (!toys.optflags && -1!=sched_getaffinity(getpid(), 4096, toybuf)) {
+    for (i = 0; i<4096; i++)
+      if (toybuf[i])
+        for (j=0; j<8; j++)
+          if (toybuf[i]&(1<<j))
+            TT.nproc++;
+  }
+
+  // If getaffinity failed or --all, count cpu entries in proc
+  if (!TT.nproc) dirtree_read("/sys/devices/system/cpu", do_nproc);
+
+  xprintf("%d\n", TT.nproc);
 }

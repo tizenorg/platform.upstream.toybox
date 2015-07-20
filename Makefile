@@ -4,14 +4,18 @@
 all: toybox
 
 KCONFIG_CONFIG ?= .config
-toybox toybox_unstripped: $(KCONFIG_CONFIG) *.[ch] lib/*.[ch] toys/*.h toys/*/*.c scripts/*.sh
+
+toybox_stuff: $(KCONFIG_CONFIG) *.[ch] lib/*.[ch] toys/*.h toys/*/*.c scripts/*.sh
+
+toybox toybox_unstripped: toybox_stuff
 	scripts/make.sh
 
 .PHONY: clean distclean baseline bloatcheck install install_flat \
-	uinstall uninstall_flat test tests help
+	uinstall uninstall_flat test tests help toybox_stuff change
 
 include kconfig/Makefile
 
+$(KCONFIG_CONFIG): $(KCONFIG_TOP)
 $(KCONFIG_TOP): generated/Config.in
 generated/Config.in: toys/*/*.c scripts/genconfig.sh
 	scripts/genconfig.sh
@@ -25,7 +29,8 @@ baseline: toybox_unstripped
 bloatcheck: toybox_old toybox_unstripped
 	@scripts/bloatcheck toybox_old toybox_unstripped
 
-generated/instlist: toybox
+generated/instlist: toybox_stuff
+	NOBUILD=1 scripts/make.sh
 	$(HOSTCC) -I . scripts/install.c -o generated/instlist
 
 install_flat: generated/instlist
@@ -40,8 +45,11 @@ uninstall_flat: generated/instlist
 uninstall:
 	scripts/install.sh --long --uninstall
 
+change:
+	scripts/change.sh
+
 clean::
-	rm -rf toybox toybox_unstripped generated .singleconfig*
+	rm -rf toybox toybox_unstripped generated change .singleconfig*
 
 distclean: clean
 	rm -f toybox_old .config*
@@ -53,7 +61,8 @@ tests:
 
 help::
 	@echo  '  toybox          - Build toybox.'
-	@echo  '  baseline        - Create busybox_old for use by bloatcheck.'
+	@echo  '  change          - Build each command standalone under change/.'
+	@echo  '  baseline        - Create toybox_old for use by bloatcheck.'
 	@echo  '  bloatcheck      - Report size differences between old and current versions'
 	@echo  '  test            - Run test suite against compiled commands.'
 	@echo  '  clean           - Delete temporary files.'

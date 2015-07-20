@@ -32,6 +32,7 @@ config FIND
     -ctime N       created N days ago        -mtime N    modified N days ago
     -newer FILE    newer mtime than FILE     -mindepth # at least # dirs down
     -depth         ignore contents of dir    -maxdepth # at most # dirs down
+    -inum  N       inode number N
     -type [bcdflps] (block, char, dir, file, symlink, pipe, socket)
 
     Numbers N may be prefixed by a - (less than) or + (greater than):
@@ -72,7 +73,7 @@ static int flush_exec(struct dirtree *new, struct exec_range *aa)
 {
   struct double_list **dl;
   char **newargs;
-  int rc;
+  int rc = 0;
 
   if (!aa->namecount) return 0;
 
@@ -82,8 +83,13 @@ static int flush_exec(struct dirtree *new, struct exec_range *aa)
 
   // switch to directory for -execdir, or back to top if we have an -execdir
   // _and_ a normal -exec, or are at top of tree in -execdir
-  if (aa->dir && new->parent) fchdir(new->parent->data);
-  else if (TT.topdir != -1) fchdir(TT.topdir);
+  if (aa->dir && new->parent) rc = fchdir(new->parent->data);
+  else if (TT.topdir != -1) rc = fchdir(TT.topdir);
+  if (rc) {
+    perror_msg("%s", new->name);
+
+    return rc;
+  }
 
   // execdir: accumulated execs in this directory's children.
   newargs = xmalloc(sizeof(char *)*(aa->arglen+aa->namecount+1));
@@ -160,7 +166,7 @@ char *strlower(char *s)
         // encode back to utf8, something is wrong with your libc. But just
         // in case somebody finds an exploit...
         len = wcrtomb(new, c, 0);
-        if (len < 1) error_exit("bad utf8 %x", c);
+        if (len < 1) error_exit("bad utf8 %x", (int)c);
         new += len;
       }
     }
@@ -179,7 +185,7 @@ static int do_find(struct dirtree *new)
   struct double_list *argdata = TT.argdata;
   char *s, **ss;
 
-  recurse = DIRTREE_COMEAGAIN|((toys.optflags&FLAG_L) ? DIRTREE_SYMFOLLOW : 0);
+  recurse = DIRTREE_COMEAGAIN|(DIRTREE_SYMFOLLOW*!!(toys.optflags&FLAG_L));
 
   // skip . and .. below topdir, handle -xdev and -depth
   if (new) {
@@ -336,6 +342,9 @@ static int do_find(struct dirtree *new)
           test = compare_numsign(new->st.st_size, 512, ss[1]);
       } else if (!strcmp(s, "links")) {
         if (check) test = compare_numsign(new->st.st_nlink, 0, ss[1]);
+      } else if (!strcmp(s, "inum")) {
+        if (check)
+          test = compare_numsign(new->st.st_ino, 0, ss[1]);
       } else if (!strcmp(s, "mindepth") || !strcmp(s, "maxdepth")) {
         if (check) {
           struct dirtree *dt = new;
@@ -366,8 +375,8 @@ static int do_find(struct dirtree *new)
           udl = xmalloc(sizeof(*udl));
           dlist_add_nomalloc(&TT.argdata, (void *)udl);
 
-          if (*s == 'u') udl->u.uid = xgetpwnam(ss[1])->pw_uid;
-          else if (*s == 'g') udl->u.gid = xgetgrnam(ss[1])->gr_gid;
+          if (*s == 'u') udl->u.uid = xgetpwnamid(ss[1])->pw_uid;
+          else if (*s == 'g') udl->u.gid = xgetgrnamid(ss[1])->gr_gid;
           else {
             struct stat st;
 
@@ -430,7 +439,7 @@ static int do_find(struct dirtree *new)
           if (aa->dir && TT.topdir == -1) TT.topdir = xopen(".", 0);
 
         // collect names and execute commands
-        } else if (check) {
+        } else {
           char *name, *ss1 = ss[1];
           struct double_list **ddl;
 
@@ -438,11 +447,12 @@ static int do_find(struct dirtree *new)
           aa = (void *)llist_pop(&argdata);
           ss += aa->arglen + 1;
 
+          if (!check) goto cont;
           // name is always a new malloc, so we can always free it.
           name = aa->dir ? xstrdup(new->name) : dirtree_path(new, 0);
 
           // Mark entry so COMEAGAIN can call flush_exec() in parent.
-          // This is never a valid pointer valud for prev to have otherwise
+          // This is never a valid pointer value for prev to have otherwise
           if (aa->dir) aa->prev = (void *)1;
 
           if (*s == 'o') {
@@ -525,12 +535,9 @@ void find_main(void)
   do_find(0);
 
   // Loop through paths
-  for (i = 0; i < len; i++) {
-    struct dirtree *new;
-
-    new = dirtree_add_node(0, ss[i], toys.optflags&(FLAG_H|FLAG_L));
-    if (new) dirtree_handle_callback(new, do_find);
-  }
+  for (i = 0; i < len; i++)
+    dirtree_handle_callback(dirtree_start(ss[i], toys.optflags&(FLAG_H|FLAG_L)),
+      do_find);
 
   if (CFG_TOYBOX_FREE) {
     close(TT.topdir);
