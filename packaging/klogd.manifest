@@ -1,0 +1,14 @@
+<manifest>
+	<define>
+		<domain name="klogd"/>
+		<permit>
+		        <smack permit="_" type="w"/>
+		</permit>
+	</define>
+        <request>
+                <domain name="_"/>
+        </request>
+        <assign>
+		<filesystem path="/sbin/klogd" exec_label="klogd" />
+        </assign>
+</manifest>
