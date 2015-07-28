@@ -10,12 +10,11 @@ Source1: config
 %if "%{?profile}"=="tv"
 Source2: bin_tv.links
 Source3: sbin_tv.links
-Source4: usrbin_tv.links
 %else
 Source2: bin.links
 Source3: sbin.links
-Source4: usrbin.links
 %endif
+Source4: usrbin.links
 Source5: usrsbin.links
 Source101: klogd.service
 Source102: syslogd.service
