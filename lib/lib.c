@@ -291,6 +291,41 @@ int stridx(char *haystack, char needle)
   return off-haystack;
 }
 
+char *strlower(char *s)
+{
+  char *try, *new;
+
+  if (!CFG_TOYBOX_I18N) {
+    try = new = xstrdup(s);
+    for (; *s; s++) *(new++) = tolower(*s);
+  } else {
+    // I can't guarantee the string _won't_ expand during reencoding, so...?
+    try = new = xmalloc(strlen(s)*2+1);
+
+    while (*s) {
+      wchar_t c;
+      int len = mbrtowc(&c, s, MB_CUR_MAX, 0);
+
+      if (len < 1) *(new++) = *(s++);
+      else {
+        s += len;
+        // squash title case too
+        c = towlower(c);
+
+        // if we had a valid utf8 sequence, convert it to lower case, and can't
+        // encode back to utf8, something is wrong with your libc. But just
+        // in case somebody finds an exploit...
+        len = wcrtomb(new, c, 0);
+        if (len < 1) error_exit("bad utf8 %x", (int)c);
+        new += len;
+      }
+    }
+    *new = 0;
+  }
+
+  return try;
+}
+
 int unescape(char c)
 {
   char *from = "\\abefnrtv", *to = "\\\a\b\033\f\n\r\t\v";
@@ -540,7 +575,7 @@ void delete_tempfile(int fdin, int fdout, char **tempname)
 {
   close(fdin);
   close(fdout);
-  unlink(*tempname);
+  if (*tempname) unlink(*tempname);
   tempfile2zap = (char *)1;
   free(*tempname);
   *tempname = NULL;
@@ -833,7 +868,7 @@ void names_to_pid(char **names, int (*callback)(pid_t pid, char *name))
 
 // display first few digits of number with power of two units, except we're
 // actually just counting decimal digits and showing mil/bil/trillions.
-int human_readable(char *buf, unsigned long long num)
+int human_readable(char *buf, unsigned long long num, int style)
 {
   int end, len;
 
@@ -846,9 +881,9 @@ int human_readable(char *buf, unsigned long long num)
     buf[1] = '.';
     end = 3;
   }
-  buf[end++] = ' ';
+  if (style & HR_SPACE) buf[end++] = ' ';
   if (len) buf[end++] = " KMGTPE"[len];
-  buf[end++] = 'B';
+  if (style & HR_B) buf[end++] = 'B';
   buf[end++] = 0;
 
   return end;

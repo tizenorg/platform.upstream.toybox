@@ -1,5 +1,5 @@
 Name: toybox
-Version: 0.5.1
+Version: 0.6.0
 Release: 1%{?dist}
 Summary: Single binary providing simplified versions of system commands
 Group: Base/Utilities
