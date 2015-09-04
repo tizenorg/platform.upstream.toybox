@@ -95,15 +95,15 @@ for f in `cat %SOURCE5` ; do ln -s ../../bin/toybox $f ; done
 popd
 
 # install systemd service files for syslogd and klogd
-mkdir -p  %{buildroot}%{_unitdir}/basic.target.wants
-install -m 644 %SOURCE101  %{buildroot}%{_unitdir}/klogd.service
-ln -s ../klogd.service  %{buildroot}%{_unitdir}/basic.target.wants/klogd.service
-install -m 644 %SOURCE102  %{buildroot}%{_unitdir}/syslogd.service
-ln -s ../syslogd.service  %{buildroot}%{_unitdir}/basic.target.wants/syslogd.service
-rm -rf $RPM_BUILD_ROOT/sbin/syslogd
-cp -f $RPM_BUILD_ROOT/bin/toybox $RPM_BUILD_ROOT/sbin/syslogd
-rm -rf $RPM_BUILD_ROOT/sbin/klogd
-cp -f $RPM_BUILD_ROOT/bin/toybox $RPM_BUILD_ROOT/sbin/klogd
+#mkdir -p  %{buildroot}%{_unitdir}/basic.target.wants
+#install -m 644 %SOURCE101  %{buildroot}%{_unitdir}/klogd.service
+#ln -s ../klogd.service  %{buildroot}%{_unitdir}/basic.target.wants/klogd.service
+#install -m 644 %SOURCE102  %{buildroot}%{_unitdir}/syslogd.service
+#ln -s ../syslogd.service  %{buildroot}%{_unitdir}/basic.target.wants/syslogd.service
+#rm -rf $RPM_BUILD_ROOT/sbin/syslogd
+#cp -f $RPM_BUILD_ROOT/bin/toybox $RPM_BUILD_ROOT/sbin/syslogd
+#rm -rf $RPM_BUILD_ROOT/sbin/klogd
+#cp -f $RPM_BUILD_ROOT/bin/toybox $RPM_BUILD_ROOT/sbin/klogd
 
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/license
 cat LICENSE > $RPM_BUILD_ROOT%{_datadir}/license/toybox
@@ -129,16 +129,16 @@ cat LICENSE > $RPM_BUILD_ROOT%{_datadir}/license/toybox-symlinks-dhcpd
 %defattr(-,root,root,-)
 %{_datadir}/license/toybox-symlinks-klogd
 /sbin/klogd
-%{_unitdir}/klogd.service
-%{_unitdir}/basic.target.wants/klogd.service
+#%{_unitdir}/klogd.service
+#%{_unitdir}/basic.target.wants/klogd.service
 %manifest klogd.manifest
 
 %files symlinks-sysklogd
 %defattr(-,root,root,-)
 %{_datadir}/license/toybox-symlinks-sysklogd
 /sbin/syslogd
-%{_unitdir}/syslogd.service
-%{_unitdir}/basic.target.wants/syslogd.service
+#%{_unitdir}/syslogd.service
+#%{_unitdir}/basic.target.wants/syslogd.service
 %manifest syslogd.manifest
 
 %files symlinks-dhcp
