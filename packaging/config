@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # ToyBox version: KCONFIG_VERSION
-# Tue Sep 22 14:54:41 2015
+# Thu Sep 24 10:35:34 2015
 #
 CONFIG_TOYBOX_CONTAINER=y
 CONFIG_TOYBOX_FIFREEZE=y
@@ -15,7 +15,7 @@ CONFIG_TOYBOX_FORK=y
 #
 # Samsung developed commands
 #
-CONFIG_NSLOOKUP=y
+# CONFIG_NSLOOKUP is not set
 
 #
 # Posix commands
@@ -31,12 +31,14 @@ CONFIG_CATV=y
 # CONFIG_CKSUM is not set
 # CONFIG_CMP is not set
 # CONFIG_COMM is not set
-# CONFIG_CP is not set
-# CONFIG_CP_MORE is not set
-# CONFIG_CP_PRESERVE is not set
-# CONFIG_MV is not set
-# CONFIG_MV_MORE is not set
-# CONFIG_INSTALL is not set
+CONFIG_CP=y
+CONFIG_CP_MORE=y
+CONFIG_CP_PRESERVE=y
+CONFIG_CP_Z=y
+CONFIG_MV=y
+CONFIG_MV_MORE=y
+CONFIG_INSTALL=y
+CONFIG_INSTALL_Z=y
 # CONFIG_CPIO is not set
 # CONFIG_CUT is not set
 # CONFIG_DATE is not set
@@ -61,12 +63,12 @@ CONFIG_CATV=y
 # CONFIG_KILLALL5 is not set
 # CONFIG_LINK is not set
 # CONFIG_LN is not set
-# CONFIG_LS is not set
-# CONFIG_LS_COLOR is not set
-# CONFIG_MKDIR is not set
-# CONFIG_MKDIR_Z is not set
-# CONFIG_MKFIFO is not set
-# CONFIG_MKFIFO_Z is not set
+CONFIG_LS=y
+CONFIG_LS_COLOR=y
+CONFIG_MKDIR=y
+CONFIG_MKDIR_Z=y
+CONFIG_MKFIFO=y
+CONFIG_MKFIFO_Z=y
 # CONFIG_NICE is not set
 # CONFIG_NL is not set
 # CONFIG_NOHUP is not set
@@ -247,7 +249,8 @@ CONFIG_INSMOD=y
 # CONFIG_RMMOD is not set
 # CONFIG_SETSID is not set
 # CONFIG_SHRED is not set
-# CONFIG_STAT is not set
+CONFIG_STAT=y
+CONFIG_STAT_C=y
 # CONFIG_SWAPOFF is not set
 # CONFIG_SWAPON is not set
 # CONFIG_SWITCH_ROOT is not set
@@ -274,9 +277,9 @@ CONFIG_INSMOD=y
 # CONFIG_KILLALL is not set
 # CONFIG_MD5SUM is not set
 # CONFIG_SHA1SUM is not set
-# CONFIG_MKNOD is not set
-# CONFIG_MKNOD_Z is not set
-# CONFIG_MKTEMP is not set
+CONFIG_MKNOD=y
+CONFIG_MKNOD_Z=y
+CONFIG_MKTEMP=y
 CONFIG_MOUNT=y
 # CONFIG_PASSWD is not set
 # CONFIG_PIDOF is not set
@@ -312,9 +315,9 @@ CONFIG_UMOUNT=y
 #
 CONFIG_TOYBOX=y
 # CONFIG_TOYBOX_SUID is not set
-CONFIG_TOYBOX_LSM_NONE=y
+# CONFIG_TOYBOX_LSM_NONE is not set
 # CONFIG_TOYBOX_SELINUX is not set
-# CONFIG_TOYBOX_SMACK is not set
+CONFIG_TOYBOX_SMACK=y
 # CONFIG_TOYBOX_FLOAT is not set
 CONFIG_TOYBOX_HELP=y
 CONFIG_TOYBOX_HELP_DASHDASH=y
