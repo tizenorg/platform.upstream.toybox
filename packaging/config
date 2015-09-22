@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # ToyBox version: KCONFIG_VERSION
-# Thu Aug 20 11:23:54 2015
+# Tue Sep 22 14:54:41 2015
 #
 CONFIG_TOYBOX_CONTAINER=y
 CONFIG_TOYBOX_FIFREEZE=y
@@ -11,6 +11,11 @@ CONFIG_TOYBOX_UTMPX=y
 CONFIG_TOYBOX_SHADOW=y
 # CONFIG_TOYBOX_ON_ANDROID is not set
 CONFIG_TOYBOX_FORK=y
+
+#
+# Samsung developed commands
+#
+CONFIG_NSLOOKUP=y
 
 #
 # Posix commands
