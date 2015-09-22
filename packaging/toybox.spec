@@ -117,6 +117,7 @@ cat LICENSE > $RPM_BUILD_ROOT%{_datadir}/license/toybox-symlinks-dhcpd
 %doc LICENSE
 %{_datadir}/license/toybox
 /bin/toybox
+/usr/bin/nslookup
 %if "%{?profile}"=="tv"
 /sbin/ping
 /bin/ping
