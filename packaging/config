@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # ToyBox version: KCONFIG_VERSION
-# Tue Sep 22 14:54:41 2015
+# Mon Sep 21 18:43:50 2015
 #
 CONFIG_TOYBOX_CONTAINER=y
 CONFIG_TOYBOX_FIFREEZE=y
@@ -34,9 +34,11 @@ CONFIG_CATV=y
 # CONFIG_CP is not set
 # CONFIG_CP_MORE is not set
 # CONFIG_CP_PRESERVE is not set
+# CONFIG_CP_Z is not set
 # CONFIG_MV is not set
 # CONFIG_MV_MORE is not set
 # CONFIG_INSTALL is not set
+# CONFIG_INSTALL_Z is not set
 # CONFIG_CPIO is not set
 # CONFIG_CUT is not set
 # CONFIG_DATE is not set
@@ -248,6 +250,7 @@ CONFIG_INSMOD=y
 # CONFIG_SETSID is not set
 # CONFIG_SHRED is not set
 # CONFIG_STAT is not set
+# CONFIG_STAT_C is not set
 # CONFIG_SWAPOFF is not set
 # CONFIG_SWAPON is not set
 # CONFIG_SWITCH_ROOT is not set
