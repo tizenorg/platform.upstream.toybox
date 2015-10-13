@@ -78,7 +78,7 @@ static char* ftype_to_string(uint64_t ftype)
 	case 0x517B: return "smb";
 	case 0x4d44: return "msdos";
 	case 0x4006: return "fat";
-    //case 0x43415d53: return "smackfs";
+    case 0x43415d53: return "smackfs";
     case 0x73717368: return "squashfs";
     default: return "unknown";
   }
