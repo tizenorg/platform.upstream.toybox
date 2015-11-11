@@ -49,10 +49,10 @@ CONFIG_INSTALL_Z=y
 # CONFIG_ENV is not set
 # CONFIG_EXPAND is not set
 # CONFIG_FALSE is not set
-# CONFIG_FIND is not set
-# CONFIG_GREP is not set
-# CONFIG_EGREP is not set
-# CONFIG_FGREP is not set
+CONFIG_FIND=y
+CONFIG_GREP=y
+CONFIG_EGREP=y
+CONFIG_FGREP=y
 # CONFIG_HEAD is not set
 # CONFIG_ID is not set
 # CONFIG_ID_Z is not set
@@ -74,13 +74,13 @@ CONFIG_MKFIFO_Z=y
 # CONFIG_NOHUP is not set
 # CONFIG_OD is not set
 # CONFIG_PASTE is not set
-# CONFIG_PATCH is not set
+CONFIG_PATCH=y
 # CONFIG_PRINTF is not set
 # CONFIG_PWD is not set
 # CONFIG_RENICE is not set
 CONFIG_RM=y
 # CONFIG_RMDIR is not set
-# CONFIG_SED is not set
+CONFIG_SED=y
 # CONFIG_SLEEP is not set
 # CONFIG_SLEEP_FLOAT is not set
 # CONFIG_SORT is not set
@@ -113,8 +113,8 @@ CONFIG_RM=y
 # CONFIG_BOOTCHARTD is not set
 # CONFIG_BRCTL is not set
 # CONFIG_COMPRESS is not set
-# CONFIG_GZIP is not set
-# CONFIG_GZIP_D is not set
+CONFIG_GZIP=y
+CONFIG_GZIP_D=y
 # CONFIG_DECOMPRESS is not set
 # CONFIG_ZCAT is not set
 # CONFIG_GUNZIP is not set
@@ -124,7 +124,7 @@ CONFIG_RM=y
 CONFIG_DHCP=y
 CONFIG_DHCPD=y
 CONFIG_DEBUG_DHCP=y
-# CONFIG_DIFF is not set
+CONFIG_DIFF=y
 CONFIG_DUMPLEASES=y
 # CONFIG_EXPR is not set
 # CONFIG_FDISK is not set
@@ -165,7 +165,7 @@ CONFIG_PING=y
 # CONFIG_CD is not set
 # CONFIG_SULOGIN is not set
 CONFIG_SYSLOGD=y
-# CONFIG_TAR is not set
+CONFIG_TAR=y
 # CONFIG_TCPSVD is not set
 # CONFIG_TELNET is not set
 # CONFIG_TELNETD is not set
