@@ -1,3 +1,11 @@
 dumpleases
 dhcp
 nslookup
+patch
+diff
+sed
+grep
+egrep
+fgrep
+find
+xargs
