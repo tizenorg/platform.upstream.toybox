@@ -25,12 +25,6 @@ Source1003: klogd.manifest
 BuildRequires : smack-devel
 BuildRequires : libattr-devel
 
-Provides : findutils
-Provides : sed
-Provides : diffutils
-Provides : patch
-Provides : grep
-
 %description 
 Toybox is a single binary which includes versions of a large number
 of system commands, including a shell.  This package can be very
@@ -124,15 +118,6 @@ cat LICENSE > $RPM_BUILD_ROOT%{_datadir}/license/toybox-symlinks-dhcpd
 %{_datadir}/license/toybox
 /bin/toybox
 /usr/bin/nslookup
-/usr/bin/patch
-/usr/bin/diff
-/usr/bin/sed
-/usr/bin/grep
-/usr/bin/egrep
-/usr/bin/fgrep
-/usr/bin/find
-/usr/bin/xargs
-
 %if "%{?profile}"=="tv"
 /sbin/ping
 /bin/ping
