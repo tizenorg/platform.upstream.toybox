@@ -67,7 +67,7 @@ config CP_Z
   help
     usage: cp [-Z]
 
-    set SMACK security context of destination file to default type
+    set security context of destination file to default type
 
 config MV
   bool "mv"
@@ -401,7 +401,7 @@ void cp_main(void)
       TT.c.context = NULL;
       if (!CFG_TOYBOX_LSM_NONE && lsm_enabled()) {
         if (0>lsm_lget_context(src, &TT.c.context))
-          perror_exit("unknown SMACK label for '%s'", src);
+          perror_exit("unknown security context for '%s'", src);
         if (0>lsm_set_create(TT.c.context))
           perror_exit("preserve context '%s' failed", TT.c.context);
         free(TT.c.context);
@@ -416,7 +416,7 @@ void cp_main(void)
           if (toys.optflags & FLAG_Z) TT.c.context = lsm_context();
           else {
             if (0>lsm_lget_context(src, &TT.c.context))
-              perror_exit("unknown SMACK label for '%s'", src);
+              perror_exit("unknown security context for '%s'", src);
           }
         } else error_exit("%s disabled", lsm_name());
       }
