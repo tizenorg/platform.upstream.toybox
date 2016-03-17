@@ -39,7 +39,7 @@ GLOBALS(
   char *mode;
 )
 
-static int do_chmod(struct dirtree *try)
+int do_chmod(struct dirtree *try)
 {
   mode_t mode;
 

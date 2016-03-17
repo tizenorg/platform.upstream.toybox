@@ -1,4 +1,4 @@
-/* bzcat.c - bzip2 decompression
+/* bzcat.c - decompress stdin to stdout using bunzip2.
  *
  * Copyright 2003, 2007 Rob Landley <rob@landley.net>
  *
@@ -12,33 +12,16 @@
 
 
 USE_BZCAT(NEWTOY(bzcat, NULL, TOYFLAG_USR|TOYFLAG_BIN))
-USE_BUNZIP2(NEWTOY(bunzip2, "cftkv", TOYFLAG_USR|TOYFLAG_BIN))
-
-config BUNZIP2
-  bool "bunzip2"
-  default y
-  help
-    usage: bunzip2 [-cftkv] [FILE...]
-
-    Decompress listed files (file.bz becomes file) deleting archive file(s).
-    Read from stdin if no files listed.
-
-    -c	force output to stdout
-    -f	force decompression. (If FILE doesn't end in .bz, replace original.)
-    -k	keep input files (-c and -t imply this)
-    -t  test integrity
-    -v	verbose
 
 config BZCAT
   bool "bzcat"
   default y
   help
-    usage: bzcat [FILE...]
+    usage: bzcat [filename...]
 
     Decompress listed files to stdout. Use stdin if no files listed.
 */
 
-#define FOR_bunzip2
 #include "toys.h"
 
 #define THREADS 1
@@ -438,7 +421,7 @@ static int read_huffman_data(struct bunzip_data *bd, struct bwdata *bw)
 }
 
 // Flush output buffer to disk
-static void flush_bunzip_outbuf(struct bunzip_data *bd, int out_fd)
+void flush_bunzip_outbuf(struct bunzip_data *bd, int out_fd)
 {
   if (bd->outbufPos) {
     if (write(out_fd, bd->outbuf, bd->outbufPos) != bd->outbufPos)
@@ -447,7 +430,7 @@ static void flush_bunzip_outbuf(struct bunzip_data *bd, int out_fd)
   }
 }
 
-static void burrows_wheeler_prep(struct bunzip_data *bd, struct bwdata *bw)
+void burrows_wheeler_prep(struct bunzip_data *bd, struct bwdata *bw)
 {
   int ii, jj;
   unsigned int *dbuf = bw->dbuf;
@@ -491,7 +474,7 @@ static void burrows_wheeler_prep(struct bunzip_data *bd, struct bwdata *bw)
 }
 
 // Decompress a block of text to intermediate buffer
-static int read_bunzip_data(struct bunzip_data *bd)
+int read_bunzip_data(struct bunzip_data *bd)
 {
   int rc = read_block_header(bd, bd->bwdata);
   if (!rc) rc=read_huffman_data(bd, bd->bwdata);
@@ -510,8 +493,7 @@ static int read_bunzip_data(struct bunzip_data *bd)
 // http://dogma.net/markn/articles/bwt/bwt.htm
 // http://marknelson.us/1996/09/01/bwt/
 
-static int write_bunzip_data(struct bunzip_data *bd, struct bwdata *bw,
-  int out_fd, char *outbuf, int len)
+int write_bunzip_data(struct bunzip_data *bd, struct bwdata *bw, int out_fd, char *outbuf, int len)
 {
   unsigned int *dbuf = bw->dbuf;
   int count, pos, current, run, copies, outbyte, previous, gotcount = 0;
@@ -602,8 +584,7 @@ dataus_interruptus:
 
 // Allocate the structure, read file header. If !len, src_fd contains
 // filehandle to read from. Else inbuf contains data.
-static int start_bunzip(struct bunzip_data **bdp, int src_fd, char *inbuf,
-  int len)
+int start_bunzip(struct bunzip_data **bdp, int src_fd, char *inbuf, int len)
 {
   struct bunzip_data *bd;
   unsigned int i;
@@ -641,10 +622,10 @@ static int start_bunzip(struct bunzip_data **bdp, int src_fd, char *inbuf,
 
 // Example usage: decompress src_fd to dst_fd. (Stops at end of bzip data,
 // not end of file.)
-static char *bunzipStream(int src_fd, int dst_fd)
+void bunzipStream(int src_fd, int dst_fd)
 {
   struct bunzip_data *bd;
-  char *bunzip_errors[] = {0, "not bzip", "bad data", "old format"};
+  char *bunzip_errors[]={NULL, "not bzip", "bad data", "old format"};
   int i, j;
 
   if (!(i = start_bunzip(&bd,src_fd, 0, 0))) {
@@ -655,67 +636,15 @@ static char *bunzipStream(int src_fd, int dst_fd)
 
   for (j=0; j<THREADS; j++) free(bd->bwdata[j].dbuf);
   free(bd);
-
-  return bunzip_errors[-i];
+  if (i) error_exit(bunzip_errors[-i]);
 }
 
 static void do_bzcat(int fd, char *name)
 {
-  char *err = bunzipStream(fd, 1);
-
-  if (err) error_exit(err);
+  bunzipStream(fd, 1);
 }
 
 void bzcat_main(void)
 {
   loopfiles(toys.optargs, do_bzcat);
-}
-
-static void do_bunzip2(int fd, char *name)
-{
-  int outfd = 1, rename = 0, len = strlen(name);
-  char *tmp, *err, *dotbz = 0;
-
-  // Trim off .bz or .bz2 extension
-  dotbz = name+len-3;
-  if ((len>3 && !strcmp(dotbz, ".bz")) || (len>4 && !strcmp(--dotbz, ".bz2")))
-    dotbz = 0;
-
-  // For - no replace
-  if (toys.optflags&FLAG_t) outfd = xopen("/dev/null", O_WRONLY);
-  else if ((fd || strcmp(name, "-")) && !(toys.optflags&FLAG_c)) {
-    if (toys.optflags&FLAG_k) {
-      if (!dotbz || !access(name, X_OK)) {
-        error_msg("%s exists", name);
-
-        return;
-      }
-    }
-    outfd = copy_tempfile(fd, name, &tmp);
-    rename++;
-  }
-
-  if (toys.optflags&FLAG_v) printf("%s:", name);
-  err = bunzipStream(fd, outfd);
-  if (toys.optflags&FLAG_v) {
-    printf("%s\n", err ? err : "ok");
-    toys.exitval |= !!err;
-  } else if (err) error_msg(err);
-
-  // can't test outfd==1 because may have been called with stdin+stdout closed
-  if (rename) {
-    if (toys.optflags&FLAG_k) {
-      free(tmp);
-      tmp = 0;
-    } else {
-      if (dotbz) *dotbz = '.';
-      if (!unlink(name)) perror_msg("%s", name);
-    }
-    (err ? delete_tempfile : replace_tempfile)(-1, outfd, &tmp);
-  }
-}
-
-void bunzip2_main(void)
-{
-  loopfiles(toys.optargs, do_bunzip2);
 }

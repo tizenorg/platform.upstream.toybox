@@ -5,14 +5,14 @@
  *
  * No Standard
 
-USE_SYSLOGD(NEWTOY(syslogd,">0l#<1>8=8R:b#<0>99=1B#<0>99=0s#<0=2000m#<0>71582787=20O:p:f:a:nSKLD", TOYFLAG_SBIN|TOYFLAG_STAYROOT))
+USE_SYSLOGD(NEWTOY(syslogd,">0l#<1>8=8R:b#<0>99=1s#<0=200m#<0>71582787=20O:p:f:a:nSKLD", TOYFLAG_SBIN|TOYFLAG_STAYROOT))
 
 config SYSLOGD
   bool "syslogd"
-  default y
+  default n
   help
   usage: syslogd  [-a socket] [-O logfile] [-f config file] [-m interval]
-                  [-p socket] [-s SIZE] [-b N] [-B N][-R HOST] [-l N] [-nSLKD]
+                  [-p socket] [-s SIZE] [-b N] [-R HOST] [-l N] [-nSLKD]
 
   System logging utility
 
@@ -27,7 +27,6 @@ config SYSLOGD
   -L      Log locally and via network (default is network only if -R)"
   -s SIZE Max size (KB) before rotation (default:200KB, 0=off)
   -b N    rotated logs to keep (default:1, max=99, 0=purge)
-  -B N      Set number of logs to keep logs in memory buffer before write (default:0, max=99, 0=purge)
   -K      Log to kernel printk buffer (use dmesg to read it)
   -l N    Log only messages more urgent than prio(default:8 max:8 min:1)
   -D      Drop duplicates
@@ -55,12 +54,6 @@ struct logfile {
   struct sockaddr_in saddr;
 };
 
-// Log buffer
-struct logbuffer {
-  int len;
-  char buf[1024];
-};
-
 GLOBALS(
   char *socket;
   char *config_file;
@@ -68,7 +61,6 @@ GLOBALS(
   char *logfile;
   long interval;
   long rot_size;
-  long buf_count;
   long rot_count;
   char *remote_log;
   long log_prio;
@@ -286,9 +278,7 @@ static void open_logfiles(void)
 //write to file with rotation
 static int write_rotate(struct logfile *tf, int len)
 {
-  int size, isreg, idx;
-  static int buf_idx = 0;
-  static struct logbuffer buffer[100];
+  int size, isreg;
   struct stat statf;
   isreg = (!fstat(tf->logfd, &statf) && S_ISREG(statf.st_mode));
   size = statf.st_size;
@@ -317,18 +307,6 @@ static int write_rotate(struct logfile *tf, int len)
       }
       ftruncate(tf->logfd, 0);
     }
-  }
-  if (TT.buf_count && (toys.optflags & FLAG_B)) {
-    if (buf_idx < TT.buf_count) {
-      memcpy(buffer[buf_idx].buf, toybuf, len);
-	  buffer[buf_idx].buf[len + 1] = '\0';
-	  buffer[buf_idx].len = len;
-	  buf_idx++;
-	  return len;
-	} else {
-	  for (idx = 0; idx < TT.buf_count; idx++) write(tf->logfd, buffer[idx].buf, buffer[idx].len);
-	  buf_idx = 0;
-	}
   }
   return write(tf->logfd, toybuf, len);
 }

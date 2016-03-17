@@ -40,6 +40,7 @@ void nbd_client_main(void)
 {
   int sock = -1, nbd, flags;
   unsigned long timeout = 0;
+  struct addrinfo *addr, *p;
   char *host=toys.optargs[0], *port=toys.optargs[1], *device=toys.optargs[2];
   uint64_t devsize;
 
@@ -48,10 +49,23 @@ void nbd_client_main(void)
   nbd = xopen(device, O_RDWR);
   for (;;) {
     int temp;
+    struct addrinfo hints;
 
     // Find and connect to server
 
-    sock = xconnect(host, port, AF_UNSPEC, SOCK_STREAM, 0, 0);
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    if (getaddrinfo(host, port, &hints, &addr)) addr = 0;
+    for (p = addr; p; p = p->ai_next) {
+      sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+      if (-1 != connect(sock, p->ai_addr, p->ai_addrlen)) break;
+      close(sock);
+    }
+    freeaddrinfo(addr);
+
+    if (!p) perror_exit("%s:%s", host, port);
+
     temp = 1;
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &temp, sizeof(int));
 

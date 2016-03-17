@@ -7,9 +7,9 @@
 // options shared between mv/cp must be in same order (right to left)
 // for FLAG macros to work out right in shared infrastructure.
 
-USE_CP(NEWTOY(cp, "<2"USE_CP_PRESERVE("(preserve):;")"RHLPp"USE_CP_MORE("rdasl"USE_CP_Z("Z")"vnF(remove-destination)")"fi[-HLP"USE_CP_MORE("d")"]"USE_CP_MORE("[-ni]"), TOYFLAG_BIN))
-USE_MV(NEWTOY(mv, "<2"USE_CP_Z("Z")""USE_CP_MORE("vnF")"fi"USE_CP_MORE("[-ni]"), TOYFLAG_BIN))
-USE_INSTALL(NEWTOY(install, "<1"USE_INSTALL_Z("Z:")"cdDpsvm:o:g:", TOYFLAG_USR|TOYFLAG_BIN))
+USE_CP(NEWTOY(cp, "<2"USE_CP_PRESERVE("(preserve):;")"RHLPp"USE_CP_MORE("rdaslvnF(remove-destination)")"fi[-HLP"USE_CP_MORE("d")"]"USE_CP_MORE("[-ni]"), TOYFLAG_BIN))
+USE_MV(NEWTOY(mv, "<2"USE_CP_MORE("vnF")"fi"USE_CP_MORE("[-ni]"), TOYFLAG_BIN))
+USE_INSTALL(NEWTOY(install, "<1cdDpsvm:o:g:", TOYFLAG_USR|TOYFLAG_BIN))
 
 config CP
   bool "cp"
@@ -49,7 +49,7 @@ config CP_PRESERVE
   default y
   depends on CP_MORE
   help
-    usage: cp [--preserve=motca]
+    usage: cp [--preserve=mota]
 
     --preserve takes either a comma separated list of attributes, or the first
     letter(s) of:
@@ -57,17 +57,7 @@ config CP_PRESERVE
             mode - permissions (ignore umask for rwx, copy suid and sticky bit)
        ownership - user and group
       timestamps - file creation, modification, and access times.
-         context - preserve src's context.
              all - all of the above
-
-config CP_Z
-  bool
-  default y
-  depends on CP_MORE && !TOYBOX_LSM_NONE
-  help
-    usage: cp [-Z]
-
-    set security context of destination file to default type
 
 config MV
   bool "mv"
@@ -106,15 +96,6 @@ config INSTALL
     -p	Preserve timestamps
     -s	Call "strip -p"
     -v	Verbose
-
-config INSTALL_Z
-  bool
-  default y
-  depends on INSTALL && !TOYBOX_LSM_NONE
-  help
-    usage: [-Z context]
-
-    -Z  set security context
 */
 
 #define FOR_cp
@@ -127,11 +108,9 @@ GLOBALS(
       char *group;
       char *user;
       char *mode;
-      char *context;
     } i;
     struct {
       char *preserve;
-      char *context;
     } c;
   };
 
@@ -337,14 +316,9 @@ int cp_node(struct dirtree *try)
       xclose(fdout);
     }
 
-    if (CFG_MV && toys.which->name[0] == 'm') {
+    if (CFG_MV && toys.which->name[0] == 'm')
       if (unlinkat(tfd, try->name, S_ISDIR(try->st.st_mode) ? AT_REMOVEDIR :0))
         err = "%s";
-      if (CFG_CP_Z) {
-        if (0>lsm_lset_context(catch, TT.c.context))
-          perror_exit("-Z '%s' failed", TT.c.context);
-      }
-    }
   }
 
   if (err) perror_msg(err, catch);
@@ -354,7 +328,7 @@ int cp_node(struct dirtree *try)
 void cp_main(void)
 {
   char *destname = toys.optargs[--toys.optc],
-       *preserve[] = {"mode", "ownership", "timestamps", "context"};
+       *preserve[] = {"mode", "ownership", "timestamps"};
   int i, destdir = !stat(destname, &TT.top) && S_ISDIR(TT.top.st_mode);
 
   if (toys.optc>1 && !destdir) error_exit("'%s' not directory", destname);
@@ -396,30 +370,8 @@ void cp_main(void)
     if (destdir) TT.destname = xmprintf("%s/%s", destname, basename(src));
     else TT.destname = destname;
 
-    // Preserve Context
-    if (TT.pflags & 8) {
-      TT.c.context = NULL;
-      if (!CFG_TOYBOX_LSM_NONE && lsm_enabled()) {
-        if (0>lsm_lget_context(src, &TT.c.context))
-          perror_exit("unknown security context for '%s'", src);
-        if (0>lsm_set_create(TT.c.context))
-          perror_exit("preserve context '%s' failed", TT.c.context);
-        free(TT.c.context);
-      } else error_exit("%s disabled", lsm_name());
-    }
-
     errno = EXDEV;
     if (CFG_MV && toys.which->name[0] == 'm') {
-      if (CFG_CP_Z) {
-        if (lsm_enabled()) {
-          TT.c.context = NULL;
-          if (toys.optflags & FLAG_Z) TT.c.context = lsm_context();
-          else {
-            if (0>lsm_lget_context(src, &TT.c.context))
-              perror_exit("unknown security context for '%s'", src);
-          }
-        } else error_exit("%s disabled", lsm_name());
-      }
       if (!(toys.optflags & FLAG_f)) {
         struct stat st;
 
@@ -434,14 +386,7 @@ void cp_main(void)
         }
       }
 
-      if (rc) {
-        rc = rename(src, TT.destname);
-        if (CFG_CP_Z) {
-          if (!rc && (toys.optflags&FLAG_Z)
-              && (0>lsm_lset_context(TT.destname, TT.c.context)))
-            perror_exit("-Z '%s' failed", TT.c.context);
-        }
-      }
+      if (rc) rc = rename(src, TT.destname);
     }
 
     // Skip nonexistent sources
@@ -452,9 +397,6 @@ void cp_main(void)
       else dirtree_handle_callback(new, TT.callback);
     }
     if (destdir) free(TT.destname);
-    if (CFG_CP_Z && CFG_MV && toys.which->name[0] == 'm'
-        && (toys.optflags & FLAG_Z))
-      free(TT.c.context);
   }
 }
 
@@ -489,13 +431,6 @@ void install_main(void)
 {
   char **ss;
   int flags = toys.optflags;
-
-  if (CFG_INSTALL_Z && (toys.optflags&FLAG_Z)) {
-    if (lsm_enabled()) {
-      if (0>lsm_set_create(TT.i.context))
-        perror_exit("bad -Z '%s'", TT.i.context);
-    } else error_msg("%s disabled", lsm_name());
-  }
 
   if (flags & FLAG_d) {
     for (ss = toys.optargs; *ss; ss++) {

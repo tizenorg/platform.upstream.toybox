@@ -137,8 +137,6 @@ void hexedit_main(void)
       fd = xopen(*toys.optargs, ro ? O_RDONLY : O_RDWR);
   char keybuf[16];
 
-  *keybuf = 0;
-
   // Terminal setup
   TT.height = 25;
   terminal_size(0, &TT.height);

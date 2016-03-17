@@ -40,7 +40,7 @@ GLOBALS(
   long lcount;
 )
 
-static void do_nl(int fd, char *name)
+void do_nl(int fd, char *name)
 {
   FILE *f = xfdopen(fd, "r");
   int w = TT.w, slen = strlen(TT.s);

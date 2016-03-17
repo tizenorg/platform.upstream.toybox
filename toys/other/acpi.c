@@ -25,7 +25,10 @@ config ACPI
 #include "toys.h"
 
 GLOBALS(
-  int ac, bat, therm, cool;
+  int ac;
+  int bat;
+  int therm;
+  int cool;
   char *cpath;
 )
 
@@ -41,7 +44,7 @@ int read_int_at(int dirfd, char *name)
   return ret;
 }
 
-static int acpi_callback(struct dirtree *tree)
+int acpi_callback(struct dirtree *tree)
 {
   int dfd, fd, len, on;
 
@@ -82,11 +85,11 @@ done:
   return 0;
 }
 
-static int temp_callback(struct dirtree *tree)
+int temp_callback(struct dirtree *tree)
 {
   int dfd, temp;
 
-  if (*tree->name=='.') return 0;
+  if (tree->name[0]=='.') return 0;
   if (!tree->parent || !tree->parent->parent)
     return DIRTREE_RECURSE|DIRTREE_SYMFOLLOW;
   errno = 0;
@@ -95,17 +98,17 @@ static int temp_callback(struct dirtree *tree)
     if ((0 < (temp = read_int_at(dfd, "temp"))) || !errno) {
       //some tempertures are in milli-C, some in deci-C
       //reputedly some are in deci-K, but I have not seen them
-      if (((temp >= 1000) || (temp <= -1000)) && (temp%100 == 0)) temp /= 100;
+      if (((temp >= 1000) || (temp <= -1000)) && (temp%100 == 0))
+        temp /= 100;
       printf("Thermal %d: %d.%d degrees C\n", TT.therm++, temp/10, temp%10);
     }
     close(dfd);
   }
   free(TT.cpath);
-
   return 0;
 }
 
-static int cool_callback(struct dirtree *tree)
+int cool_callback(struct dirtree *tree)
 {
   int dfd=5, cur, max;
 

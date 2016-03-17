@@ -15,7 +15,7 @@ config TAC
 
 #include "toys.h"
 
-static void do_tac(int fd, char *name)
+void do_tac(int fd, char *name)
 {
   struct arg_list *list = NULL;
   char *c;

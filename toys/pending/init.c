@@ -348,7 +348,6 @@ static void halt_poweroff_reboot_handler(int sig_no)
       reboot_magic_no=RB_POWER_OFF;
       break;
     case SIGTERM:  
-    case SIGINT:
       error_msg("Requesting system reboot");
       reboot_magic_no=RB_AUTOBOOT;
       break;
@@ -416,7 +415,7 @@ static void pause_handler(int sig_no)
 
   errno_backup = errno;
   signal_backup = caught_signal;
-  xsignal(SIGCONT, catch_signal);
+  signal(SIGCONT, catch_signal);
 
   while(1) {
     if (caught_signal == SIGCONT) break;
@@ -461,11 +460,10 @@ void init_main(void)
   putenv("USER=root");
 
   inittab_parsing();  
-  xsignal(SIGUSR1, halt_poweroff_reboot_handler);//halt
-  xsignal(SIGUSR2, halt_poweroff_reboot_handler);//poweroff
-  xsignal(SIGTERM, halt_poweroff_reboot_handler);//reboot
-  xsignal(SIGINT, halt_poweroff_reboot_handler);//reboot
-  xsignal(SIGQUIT, restart_init_handler);//restart init
+  signal(SIGUSR1, halt_poweroff_reboot_handler);//halt
+  signal(SIGUSR2, halt_poweroff_reboot_handler);//poweroff
+  signal(SIGTERM, halt_poweroff_reboot_handler);//reboot
+  signal(SIGQUIT, restart_init_handler);//restart init
   memset(&sig_act, 0, sizeof(sig_act));
   sigfillset(&sig_act.sa_mask);
   sigdelset(&sig_act.sa_mask, SIGCONT);
@@ -473,6 +471,7 @@ void init_main(void)
   sigaction(SIGTSTP, &sig_act, NULL);
   memset(&sig_act, 0, sizeof(sig_act));
   sig_act.sa_handler = catch_signal;
+  sigaction(SIGINT, &sig_act, NULL);
   sigaction(SIGHUP, &sig_act, NULL);  
   run_action_from_list(SYSINIT);
   check_if_pending_signals();

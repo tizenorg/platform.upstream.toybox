@@ -15,12 +15,6 @@ config STAT
     -f display filesystem status instead of file status
     -c Output specified FORMAT string instead of default
 
-    The valid format escape sequences for filesystems:
-    %a  Available blocks    |%b  Total blocks       |%c  Total inodes
-    %d  Free inodes         |%f  Free blocks        |%i  File system ID
-    %l  Max filename length |%n  File name          |%s  Fragment size
-    %S  Best transfer size  |%t  File system type   |%T  Type in human readable form
-
     The valid format escape sequences for files:
     %a  Access bits (octal) |%A  Access bits (flags)|%b  Blocks allocated
     %B  Bytes per block     |%d  Device ID (dec)    |%D  Device ID (hex)
@@ -31,14 +25,11 @@ config STAT
     %x  Access time         |%X  Access unix time   |%y  File write time
     %Y  File write unix time|%z  Dir change time    |%Z  Dir change unix time
 
-config STAT_C
-  bool
-  default y
-  depends on STAT && !TOYBOX_LSM_NONE
-  help
-    usage: stat
-
-    %C  Security context
+    The valid format escape sequences for filesystems:
+    %a  Available blocks    |%b  Total blocks       |%c  Total inodes
+    %d  Free inodes         |%f  Free blocks        |%i  File system ID
+    %l  Max filename length |%n  File name          |%s  Fragment size
+    %S  Best transfer size  |%t  File system type
 */
 
 #define FOR_stat
@@ -54,35 +45,6 @@ GLOBALS(
   struct passwd *user_name;
   struct group *group_name;
 )
-
-static char* ftype_to_string(uint64_t ftype)
-{
-  switch (ftype) {
-    case 0xADFF: return "affs";
-    case 0x5346544e: return "ntfs";
-	case 0x1Cd1: return "devpts";
-    case 0x137D: return "ext";
-    case 0xEF51: return "ext2";
-    case 0xEF53: return "ext2/ext3";
-    case 0x1BADFACE: return "bfs";
-    case 0x9123683E: return "btrfs";
-    case 0x28cd3d45: return "cramfs";
-    case 0x3153464a: return "jfs";
-    case 0x7275: return "romfs";
-	case 0x01021994: return "tmpfs";
-	case 0x3434: return "nilfs";
-	case 0x6969: return "nfs";
-	case 0x9fa0: return "proc";
-	case 0x534F434B: return "sockfs";
-	case 0x62656572: return "sysfs";
-	case 0x517B: return "smb";
-	case 0x4d44: return "msdos";
-	case 0x4006: return "fat";
-    case 0x43415d53: return "smackfs";
-    case 0x73717368: return "squashfs";
-    default: return "unknown";
-  }
-}
 
 
 // Note: the atime, mtime, and ctime fields in struct stat are the start
@@ -108,13 +70,6 @@ static void print_stat(char type)
     xprintf("%s", str);
   } else if (type == 'b') xprintf("%llu", stat->st_blocks);
   else if (type == 'B') xprintf("%lu", stat->st_blksize);
-  else if (CFG_STAT_C && type == 'C') {
-    char *label = NULL;
-	if ((lsm_lget_context(*toys.optargs, (char **)&label) > 0) && label) {
-      xprintf("%s", label);
-	  free(label);
-	}
-  }
   else if (type == 'd') xprintf("%ldd", stat->st_dev);
   else if (type == 'D') xprintf("%llxh", stat->st_dev);
   else if (type == 'f') xprintf("%lx", stat->st_mode);
@@ -158,7 +113,6 @@ static void print_statfs(char type) {
   else if (type == 'f') xprintf("%llu", statfs->f_bfree);
   else if (type == 'l') xprintf("%ld", statfs->f_namelen);
   else if (type == 't') xprintf("%lx", statfs->f_type);
-  else if (type == 'T') xprintf("%s", ftype_to_string(statfs->f_type));
   else if (type == 'i')
     xprintf("%08x%08x", statfs->f_fsid.__val[0], statfs->f_fsid.__val[1]);
   else if (type == 's') xprintf("%d", statfs->f_frsize);
@@ -170,7 +124,7 @@ void stat_main(void)
 {
   int flagf = toys.optflags & FLAG_f;
   char *format = flagf
-    ? "  File: \"%n\"\n    ID: %i Namelen: %l    Type: %T\n"
+    ? "  File: \"%n\"\n    ID: %i Namelen: %l    Type: %t\n"
       "Block Size: %s    Fundamental block size: %S\n"
       "Blocks: Total: %b\tFree: %f\tAvailable: %a\n"
       "Inodes: Total: %c\tFree: %d"

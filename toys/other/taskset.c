@@ -120,7 +120,7 @@ void taskset_main(void)
   }
 }
 
-static int do_nproc(struct dirtree *new)
+int do_nproc(struct dirtree *new)
 {
   if (!new->parent) return DIRTREE_RECURSE;
   if (!strncmp(new->name, "cpu", 3) && isdigit(new->name[3])) TT.nproc++;

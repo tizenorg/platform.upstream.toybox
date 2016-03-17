@@ -29,7 +29,7 @@ GLOBALS(
   long num;
 )
 
-static void do_strings(int fd, char *filename)
+void do_strings(int fd, char *filename)
 {
   int nread, i, wlen = TT.num, count = 0;
   off_t offset = 0;
