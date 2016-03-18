@@ -13,6 +13,11 @@ CONFIG_TOYBOX_SHADOW=y
 CONFIG_TOYBOX_FORK=y
 
 #
+# Samsung developed commands
+#
+CONFIG_NSLOOKUP=y
+
+#
 # Posix commands
 #
 # CONFIG_BASENAME is not set

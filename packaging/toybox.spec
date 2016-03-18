@@ -3,12 +3,17 @@ Version: 0.6.0
 Release: 1%{?dist}
 Summary: Single binary providing simplified versions of system commands
 Group: Base/Utilities
-License: BSD-2-Clause-FreeBSD 
+License: BSD-2-Clause-FreeBSD
 URL: http://www.landley.net/toybox/
 Source: %{name}-%{version}.tar.bz2
 Source1: config
+%if "%{?profile}"=="tv"
+Source2: bin_tv.links
+Source3: sbin_tv.links
+%else
 Source2: bin.links
 Source3: sbin.links
+%endif
 Source4: usrbin.links
 Source5: usrsbin.links
 Source1001: toybox.manifest
@@ -16,7 +21,7 @@ Source1001: toybox.manifest
 BuildRequires : smack-devel
 BuildRequires : libattr-devel
 
-%description 
+%description
 Toybox is a single binary which includes versions of a large number
 of system commands, including a shell.  This package can be very
 useful for recovering from certain types of system failures,
@@ -72,6 +77,13 @@ popd
 %license LICENSE
 %defattr(-,root,root,-)
 /bin/toybox
+/usr/bin/nslookup
+%if "%{?profile}"=="tv"
+/sbin/ping
+/bin/ping
+/sbin/ping6
+/bin/ping6
+%endif
 
 %files symlinks-dhcp
 %manifest toybox.manifest
