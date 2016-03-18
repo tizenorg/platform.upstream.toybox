@@ -7,8 +7,13 @@ License: BSD-2-Clause-FreeBSD
 URL: http://www.landley.net/toybox/
 Source: %{name}-%{version}.tar.bz2
 Source1: config
+%if "%{?profile}"=="tv"
+Source2: bin_tv.links
+Source3: sbin_tv.links
+%else
 Source2: bin.links
 Source3: sbin.links
+%endif
 Source4: usrbin.links
 Source5: usrsbin.links
 Source1001: toybox.manifest
@@ -72,6 +77,13 @@ popd
 %license LICENSE
 %defattr(-,root,root,-)
 /bin/toybox
+/usr/bin/nslookup
+%if "%{?profile}"=="tv"
+/sbin/ping
+/bin/ping
+/sbin/ping6
+/bin/ping6
+%endif
 
 %files symlinks-dhcp
 %manifest toybox.manifest
