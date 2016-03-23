@@ -3,7 +3,7 @@ Version: 0.6.0
 Release: 1%{?dist}
 Summary: Single binary providing simplified versions of system commands
 Group: Base/Utilities
-License: BSD-2-Clause-FreeBSD
+License: BSD-2.0
 URL: http://www.landley.net/toybox/
 Source: %{name}-%{version}.tar.bz2
 Source1: config
@@ -28,7 +28,7 @@ useful for recovering from certain types of system failures,
 particularly those involving broken shared libraries.
 
 %package symlinks-dhcp
-Group: tools
+Group: Base/Utilities
 Summary: ToyBox symlinks to provide 'dhcp'
 Requires: %{name} = %{version}-%{release}
 
@@ -36,7 +36,7 @@ Requires: %{name} = %{version}-%{release}
 ToyBox symlinks for utilities corresponding to 'dhcp' package.
 
 %package symlinks-dhcpd
-Group: tools
+Group: Base/Utilities
 Summary: ToyBox symlinks to provide 'dhcpd'
 Requires: %{name} = %{version}-%{release}
 
