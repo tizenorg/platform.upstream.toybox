@@ -74,7 +74,7 @@ popd
 
 %files
 %manifest toybox.manifest
-%license LICENSE
+%license LICENSE.BSD
 %defattr(-,root,root,-)
 /bin/toybox
 /usr/bin/nslookup
@@ -87,13 +87,13 @@ popd
 
 %files symlinks-dhcp
 %manifest toybox.manifest
-%license LICENSE
+%license LICENSE.BSD
 %defattr(-,root,root,-)
 %{_bindir}/dhcp
 
 %files symlinks-dhcpd
 %manifest toybox.manifest
-%license LICENSE
+%license LICENSE.BSD
 %defattr(-,root,root,-)
 %{_bindir}/dumpleases
 %{_sbindir}/dhcpd
