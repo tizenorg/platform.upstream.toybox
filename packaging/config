@@ -16,6 +16,7 @@ CONFIG_TOYBOX_FORK=y
 # Samsung developed commands
 #
 CONFIG_NSLOOKUP=y
+CONFIG_PING=y
 
 #
 # Posix commands
@@ -157,7 +158,7 @@ CONFIG_DUMPLEASES=y
 # CONFIG_OPENVT is not set
 # CONFIG_DEALLOCVT is not set
 # CONFIG_PGREP is not set
-CONFIG_PING=y
+# CONFIG_PING=y
 # CONFIG_PS is not set
 # CONFIG_ROUTE is not set
 # CONFIG_SH is not set
